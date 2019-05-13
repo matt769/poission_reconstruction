@@ -115,16 +115,13 @@ bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
 
 int main(int argc, char *argv[])
 {
-	//std::cout << 0 << "\n";
 	// load data  ************************************************************************************
 	Eigen::MatrixXd V;
 	Eigen::MatrixXd N;
-	//Eigen::MatrixXi F; 
-	//get_example_mesh("cow.obj", V, F, VN);
-	//get_example_mesh("cube.obj", V, F, VN);
-	//get_example_mesh("cube_mod.obj", V, F, VN);
-	//get_point_data("circle.obj", V);
-	get_point_data("circle.obj", V, N);
+	//get_point_data("circle.obj", V, N);
+	get_point_data("circle_noisy.obj", V, N);
+	//get_point_data("circle_noisy2.obj", V, N);
+	//std::cout << V << "\n";
 
 	std::vector<std::vector<double>> GV_oct;
 	Eigen::MatrixXi CH;
@@ -136,25 +133,16 @@ int main(int argc, char *argv[])
 
 
 
-	int depth = 8;
+	int depth = 5;
 	Eigen::MatrixXd GV;
 	Eigen::MatrixXi GE;
 	Eigen::RowVector3i gridResolution;
 	get_grid(V, depth, GV, GE, gridResolution);
 
-	
-
-
-	
-
-
-
 
 
 	//std::cout << "Grid vertices:" << GV.rows() << std::endl;
-	//std::cout << GV << std::endl;
-
-	//std::cout << 0 << "\n";
+	//std::cout << "GV:\n" << GV << std::endl;
 
 	// TODO 
 	// interpolate normals to grid points   *******************************************************************
@@ -162,6 +150,7 @@ int main(int argc, char *argv[])
 	Eigen::MatrixXd weightedNormals;
 
 	compute_grid_normals(V, N, GV, 4, weightedNormals);
+	std::cout << "res: " << gridResolution << "\n";
 
 
 	Eigen::MatrixXd VF;
@@ -218,6 +207,7 @@ int main(int argc, char *argv[])
 		std::cout << "Solving failed\n";
 	}
 
+	// Create one more grid layer (on Z direction); required by marching cubes.
 
 	Eigen::VectorXd x_3d(2 * x.rows());
 	x_3d.block(0, 0, x.rows(), 1) = x;
@@ -227,18 +217,24 @@ int main(int argc, char *argv[])
 	Eigen::MatrixXd GV_3d(2 * GV.rows(), GV.cols());
 	GV_3d.block(0, 0, GV.rows(), GV.cols()) = GV;
 	GV_3d.block(GV.rows(), 0, GV.rows(), GV.cols()) = GV;
-	GV_3d.block(GV.rows(), 2, GV.rows(), 1) += Eigen::VectorXd::Constant(GV.rows(), GV(0, 0) - GV(0, 1));
+	// Switch X and Y columns such that it follows the marching cube documentation
+	Eigen::VectorXd Aux = GV_3d.col(0);
+	GV_3d.col(0) = GV_3d.col(1);
+	GV_3d.col(1) = Aux;
 	
 	Eigen::MatrixXd MC_V;
 	Eigen::MatrixXi MC_F;
 	double isoval = compute_isovalue(V, GV, gridResolution, x);
 	std::cout << "isoval: " << isoval << "\n";
-	//isoval = -0.025;
-	igl::copyleft::marching_cubes(x_3d, GV_3d, gridResolution(0), gridResolution(1), gridResolution(2) + 1, isoval, MC_V, MC_F);
+	
+	igl::copyleft::marching_cubes(x_3d, GV_3d, gridResolution(1), gridResolution(0), gridResolution(2) + 1, isoval, MC_V, MC_F);
+	// Switch the Y and X columns back
+	Aux = MC_V.col(0);
+	MC_V.col(0) = MC_V.col(1);
+	MC_V.col(1) = Aux;
 
 	std::cout << "x:\n" << x.minCoeff() << "\n";
-	//std::cout << "res: " << gridResolution << "\n";
-	//std::cout << "MC_V:\n" << MC_V << "\n";
+	std::cout << "MC_V:\n" << MC_V << "\n";
 	std::cout << "MC_V size: " << MC_V.rows() << ", " << MC_V.cols() << "\n";
 
 	//std::cout << x << std::endl;

@@ -134,7 +134,7 @@ bool vertex_ij2idx(const Eigen::RowVector3i &res, const int r, const int c, size
 // Get vertex id from resolution and indices
 void xy2sq(const Eigen::MatrixXd &GV, const Eigen::RowVector3i &res, const double x, const double y, Eigen::Matrix<size_t, 2, 2> &square)
 {
-	const double cell_sz = (GV.col(0).maxCoeff() - GV.col(0).minCoeff()) / (res(1) - 1);
+	const double cell_sz = (GV.col(0).maxCoeff() - GV.col(0).minCoeff()) / (res(0) - 1);
 	double c = (x - GV.col(0).minCoeff()) / cell_sz;
 	double r = (y - GV.col(1).minCoeff()) / cell_sz;
 
@@ -372,14 +372,19 @@ void compute_grid_normals(const Eigen::MatrixXd &V, const Eigen::MatrixXd &N, co
 		// find neighbours
 		mat_index.index->findNeighbors(knnSearchResult, searchPoint.data(), nanoflann::SearchParams(50));
 		//Eigen::MatrixXd V_nn(neighbourIdx.size(), 3);
+		Eigen::Vector4d weights;
 		for (size_t i = 0; i < neighbourIdx.size(); i++)
 		{
 			//double weight = 1.0 / distsSqr[i];
 			//std::cout << N.row(searchPointIdx) << "\n";
-			double weight = 1.0 - distsSqr[i] / gridDiagSquared;
-			weightedNormals.row(neighbourIdx[i]) += weight * N.row(searchPointIdx);
-			totalWeight(neighbourIdx[i]) += weight;
+			weights(i) = 1.0 - distsSqr[i] / gridDiagSquared;
 			//V_nn.row(i) = V.row(neighbourIdx[i]);
+		}
+		weights /= weights.sum();
+		for (size_t i = 0; i < neighbourIdx.size(); i++)
+		{
+			weightedNormals.row(neighbourIdx[i]) += weights(i) * N.row(searchPointIdx);
+			totalWeight(neighbourIdx[i]) += weights(i);
 		}
 
 	}
@@ -395,8 +400,8 @@ void conv2d(const Eigen::MatrixXd &M, const Eigen::MatrixXd &K, const Eigen::Row
 {
 	MK = Eigen::MatrixXd::Zero(M.rows(), M.cols());
 
-	for (size_t i = 0; i < res(1); i++)
-		for (size_t j = 0; j < res(0); j++)
+	for (size_t i = 0; i < res(0); i++)
+		for (size_t j = 0; j < res(1); j++)
 		{
 			size_t o;
 			if (!vertex_ij2idx(res, i, j, o))
