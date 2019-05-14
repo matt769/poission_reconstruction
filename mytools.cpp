@@ -150,7 +150,7 @@ void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, con
 
 void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Resolution& res)
 {
-	const size_t extra_layers = 5;
+	const size_t extra_layers = 10;	// applied on each side
 
 	// find bounding area
 	Eigen::RowVector3d BBmin = V.colwise().minCoeff();
