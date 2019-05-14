@@ -121,34 +121,36 @@ void get_point_data(std::string const meshname, Eigen::MatrixXd& V, Eigen::Matri
 
 
 // Get vertex id from resolution and indices
-bool vertex_ij2idx(const Eigen::RowVector3i &res, const int r, const int c, size_t &idx)
+bool vertex_ij2idx(const Resolution& res, const int xIdx, const int yIdx, size_t &idx)
 {
-	if (r >= res(0) || c >= res(1) || r < 0 || c < 0)
+	if (yIdx >= res.y || xIdx >= res.x || yIdx < 0 || xIdx < 0)
 		return false;
 
-	idx = c * res(1) + r;
+	idx = yIdx * res.x + xIdx;
 	return true;
 }
 
 
-// Get vertex id from resolution and indices
-void xy2sq(const Eigen::MatrixXd &GV, const Eigen::RowVector3i &res, const double x, const double y, Eigen::Matrix<size_t, 2, 2> &square)
+// Get indices of vertices of containing square
+// x and y are position of any point in space
+void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, const double y, Eigen::Matrix<size_t, 2, 2> &square)
 {
-	const double cell_sz = (GV.col(0).maxCoeff() - GV.col(0).minCoeff()) / (res(0) - 1);
-	double c = (x - GV.col(0).minCoeff()) / cell_sz;
-	double r = (y - GV.col(1).minCoeff()) / cell_sz;
+	// TODO describe order of indices in 'square'
 
+	const double cell_sz = (GV.col(0).maxCoeff() - GV.col(0).minCoeff()) / (res.x - 1);
+	int xIdx = (int)((x - GV.col(0).minCoeff()) / cell_sz);
+	int yIdx = (int)((y - GV.col(1).minCoeff()) / cell_sz);
 
-	vertex_ij2idx(res, int(r), int(c), square(0, 0));
-	vertex_ij2idx(res, int(r) + 1, int(c), square(0, 1));
-	vertex_ij2idx(res, int(r), int(c) + 1, square(1, 0));
-	vertex_ij2idx(res, int(r) + 1, int(c) + 1, square(1, 1));
+	vertex_ij2idx(res, xIdx, yIdx, square(0, 0));
+	vertex_ij2idx(res, xIdx + 1, yIdx, square(0, 1));
+	vertex_ij2idx(res, xIdx, yIdx + 1, square(1, 0));
+	vertex_ij2idx(res, xIdx + 1, yIdx + 1, square(1, 1));
 }
 
 
-void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Eigen::RowVector3i& res)
+void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Resolution& res)
 {
-	const size_t extra_layers = 20;
+	const size_t extra_layers = 5;
 
 	// find bounding area
 	Eigen::RowVector3d BBmin = V.colwise().minCoeff();
@@ -161,45 +163,58 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 	BBrange = BBmax - BBmin;*/
 
 	// create grid (square mesh) across bounding area
-	// remember that there will be points on the edges
-	// what do we want as the resolution?
-	//int depth = 5; // if we think of resolution as the result of multiple equal axis splits
+	// think of resolution as the result of multiple equal axis splits
+	// or desired number of vertices along longest side
 	const int splits = pow(2, depth);
 
 	// not all sides of the bounding area may be equal
-	// split the largest by the resolution
-	const double step = BBrange.maxCoeff() / (double)splits;
-	// how many whole steps cover each side
-	res = (BBrange / step).cast<int>() + extra_layers * Eigen::RowVector3i::Ones(3);
-	res(2) = 1;
-	BBmin.block(0, 0, 1, 2) -= Eigen::RowVector2d::Constant(step * extra_layers / 2);
+	// split the largest by the split number-1 i.e. n vertices, n-1 steps between them all
+	const double step = BBrange.maxCoeff() / (double)(splits-1);
+	// how many *whole* steps cover each side
+	// TODO clean up following few lines
+	Eigen::RowVector3i tmpRes = (BBrange / step).cast<int>();
+	tmpRes += 2 * Eigen::RowVector3i::Ones(3);
+	// Add extra layers (each side)
+	tmpRes += 2 * extra_layers * Eigen::RowVector3i::Ones(3);
+	// Adjust min (starting point of grid) to account for the added layers
+	BBmin -= Eigen::RowVector3d::Constant(step * (double)extra_layers);
 
+	// Fix to 2D - remove this later
+	tmpRes(2) = 1; 
+	BBmin(2) = V.col(2).minCoeff();
+
+	res.x = tmpRes(0);
+	res.y = tmpRes(1);
+	res.z = tmpRes(2);
 
 	// now create grid vertices
-	//Eigen::MatrixXd GV(res(0) * res(1) * res(2), 3);
-	GV.resize(res(0) * res(1) * res(2), 3);
+	GV.resize(res.x * res.y * res.z, 3);
 
-	int rowIdx = 0;
-	for (int xIdx = 0; xIdx < res(0); xIdx++)
+	int vIdx = 0;
+	for (int zIdx = 0; zIdx < res.z; zIdx++)
 	{
-		double x = BBmin(0) + (step * xIdx);
+		double z = BBmin(2) + (step * zIdx);
 
-		for (int yIdx = 0; yIdx < res(1); yIdx++)
+		for (int yIdx = 0; yIdx < res.y; yIdx++)
 		{
 			double y = BBmin(1) + (step * yIdx);
 
-			for (int zIdx = 0; zIdx < res(2); zIdx++)
+			for (int xIdx = 0; xIdx < res.x; xIdx++)
 			{
-				double z = BBmin(2) + (step * zIdx);
-				GV.row(rowIdx) = Eigen::RowVector3d(x, y, z);
-				rowIdx++;
+				double x = BBmin(0) + (step * xIdx);
+				GV.row(vIdx) = Eigen::RowVector3d(x, y, z);
+				vIdx++;
 			}
 		}
 	}
 
+	// adjust grid so that center matches object center?
+
+
+
 }
 
-void construct_laplacian(Eigen::MatrixXd& GV, Eigen::SparseMatrix<double>& L, Eigen::RowVector3i& res)
+void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::SparseMatrix<double>& L)
 {
 	// ONLY SUPPORTS 2D GRID
 	int m = GV.rows();
@@ -218,31 +233,32 @@ void construct_laplacian(Eigen::MatrixXd& GV, Eigen::SparseMatrix<double>& L, Ei
 	for (int idx = 0; idx < m; idx++)
 	{
 		// note that idx is the vertex index, and the row index of the laplacian
+		// and there are res.x-1 squares on the x side
 		bool onLowerEdgeX = false;
 		bool onUpperEdgeX = false;
 		bool onLowerEdgeY = false;
 		bool onUpperEdgeY = false;
 		int neighbourCount = 4;
 
-		if (idx < res(1))
-		{
-			onLowerEdgeX = true;
-			neighbourCount -= 1;
-		}
-		else if (idx >= m - res(1))
-		{
-			onUpperEdgeX = true;
-			neighbourCount -= 1;
-		}
-
-		if (idx % res(1) == 0)
+		if (idx < res.x)
 		{
 			onLowerEdgeY = true;
 			neighbourCount -= 1;
 		}
-		else if ((idx + 1) % res(1) == 0)
+		else if (idx >= m - res.x)
 		{
 			onUpperEdgeY = true;
+			neighbourCount -= 1;
+		}
+
+		if (idx % res.x == 0)
+		{
+			onLowerEdgeX = true;
+			neighbourCount -= 1;
+		}
+		else if ((idx + 1) % res.x == 0)
+		{
+			onUpperEdgeX = true;
 			neighbourCount -= 1;
 		}
 		
@@ -252,22 +268,22 @@ void construct_laplacian(Eigen::MatrixXd& GV, Eigen::SparseMatrix<double>& L, Ei
 		// add diag
 		L.insert(idx, idx) = -1;
 		// add neighbours
-		if (!onLowerEdgeX)
-		{
-			L.insert(idx, idx - res(1)) = coeff;
-		}
-
-		if (!onUpperEdgeX)
-		{
-			L.insert(idx, idx + res(1)) = coeff;
-		}
-
 		if (!onLowerEdgeY)
+		{
+			L.insert(idx, idx - res.x) = coeff;
+		}
+
+		if (!onUpperEdgeY)
+		{
+			L.insert(idx, idx + res.x) = coeff;
+		}
+
+		if (!onLowerEdgeX)
 		{
 			L.insert(idx, idx - 1) = coeff;
 		}
 
-		if (!onUpperEdgeY)
+		if (!onUpperEdgeX)
 		{
 			L.insert(idx, idx + 1) = coeff;
 		}
@@ -277,22 +293,16 @@ void construct_laplacian(Eigen::MatrixXd& GV, Eigen::SparseMatrix<double>& L, Ei
 
 	L.makeCompressed();
 
-	//std::cout << L.block(0, 0, 5, 5) << std::endl;
-	//std::cout << L << std::endl;
-
-	// probably more efficient way to do this
-	// see also, construction from triplets https://eigen.tuxfamily.org/dox/group__TutorialSparse.html
-
 }
 
 
-void construct_divergence(Eigen::RowVector3i& res, 
+void construct_divergence(const Resolution& res,
 							Eigen::SparseMatrix<double, Eigen::RowMajor>& Dx,
 							Eigen::SparseMatrix<double, Eigen::RowMajor>& Dy)
 {
 	// ONLY SUPPORTS 2D GRID
-	int m = res(0)*res(1);
-	Dx.resize(m, m);
+	int m = res.x * res.y;
+	Dx.resize(m, m);	// is 'resize' actually required here?
 	Dy.resize(m, m);
 	// because it's a regular grid, we don't need to look for neighbours
 	// note that the grid is built by iterating through z, then y, then x
@@ -302,7 +312,7 @@ void construct_divergence(Eigen::RowVector3i& res,
 	//	0	3	6	9
 	// so the neighbours of n are: n-1, n+1 (on same column), n-y, n+y (on same row)
 
-	// reserve space for 5 non-zero elements on each row
+	// reserve space for 2 non-zero elements on each row
 	Dx.reserve(2 * m);
 	Dy.reserve(2 * m);
 
@@ -310,30 +320,31 @@ void construct_divergence(Eigen::RowVector3i& res,
 	{
 		bool onUpperEdgeX = false;
 		bool onUpperEdgeY = false;
-		int neighbourCount = 2;
+		//int neighbourCount = 2;
 
-		if (idx >= m - res(1))
+		if (idx >= m - res.x)
+		{
+			onUpperEdgeY = true;
+		}
+		if ((idx + 1) % res.x == 0)
 		{
 			onUpperEdgeX = true;
 		}
 
-		if ((idx + 1) % res(1) == 0)
-		{
-			onUpperEdgeY = true;
-		}
 
 		// add diag
 		// -2 for all, assumes that value is zero on 'virtual' neighbouring points off the grid
+		// one -1 is in Dx, one in Dy
 		Dx.insert(idx, idx) = -1.0;
 		Dy.insert(idx, idx) = -1.0;
 		// add neighbours
-		if (!onUpperEdgeX)
-		{
-			Dx.insert(idx, idx + res(1)) = 1.0;
-		}
 		if (!onUpperEdgeY)
 		{
-			Dy.insert(idx, idx + 1) = 1.0;
+			Dy.insert(idx, idx + res.x) = 1.0;
+		}
+		if (!onUpperEdgeX)
+		{
+			Dx.insert(idx, idx + 1) = 1.0;
 		}
 
 	}
@@ -343,7 +354,12 @@ void construct_divergence(Eigen::RowVector3i& res,
 
 }
 
-void compute_grid_normals(const Eigen::MatrixXd &V, const Eigen::MatrixXd &N, const Eigen::MatrixXd &GV, const size_t k, Eigen::MatrixXd &weightedNormals)
+void compute_grid_normals(
+	const Eigen::MatrixXd &V, 
+	const Eigen::MatrixXd &N, 
+	const Eigen::MatrixXd &GV, 
+	const size_t k, 
+	Eigen::MatrixXd &weightedNormals)
 {
 	weightedNormals = Eigen::MatrixXd::Zero(GV.rows(), 3);
 
@@ -396,15 +412,15 @@ void compute_grid_normals(const Eigen::MatrixXd &V, const Eigen::MatrixXd &N, co
 
 
 // Only works if M and K are 2D
-void conv2d(const Eigen::MatrixXd &M, const Eigen::MatrixXd &K, const Eigen::RowVector3i &res, Eigen::MatrixXd &MK)
+void conv2d(const Eigen::MatrixXd &M, const Eigen::MatrixXd &K, const Resolution& res, Eigen::MatrixXd &MK)
 {
 	MK = Eigen::MatrixXd::Zero(M.rows(), M.cols());
-
-	for (size_t i = 0; i < res(0); i++)
-		for (size_t j = 0; j < res(1); j++)
+	//std::cout << "In conv2d...\n";
+	for (size_t yIdx = 0; yIdx < res.y; yIdx++)
+		for (size_t xIdx = 0; xIdx < res.x; xIdx++)
 		{
 			size_t o;
-			if (!vertex_ij2idx(res, i, j, o))
+			if (!vertex_ij2idx(res, xIdx, yIdx, o))
 			{
 				std::cout << "ERROR: Invalid vertex indices!!!\n";
 				return;
@@ -412,10 +428,10 @@ void conv2d(const Eigen::MatrixXd &M, const Eigen::MatrixXd &K, const Eigen::Row
 			for (size_t ik = 0; ik < K.rows(); ik++)
 				for (size_t jk = 0; jk < K.cols(); jk++)
 				{
-					int r = i + ik - K.rows() / 2;
-					int c = j + jk - K.cols() / 2;
+					int xIdx_NB = xIdx + ik - K.rows() / 2;
+					int yIdx_NB = yIdx + jk - K.cols() / 2;
 					size_t neigh;
-					bool valid_neigh = vertex_ij2idx(res, r, c, neigh);
+					bool valid_neigh = vertex_ij2idx(res, xIdx_NB, yIdx_NB, neigh);
 					if (valid_neigh)
 						MK.row(o) += K(ik, jk) * M.row(neigh);
 				}
@@ -431,7 +447,7 @@ double lin_interp(const double lx, const double lv, const double rx, const doubl
 double compute_isovalue(
 	const Eigen::MatrixXd &V,
 	const Eigen::MatrixXd &GV,
-	const Eigen::RowVector3i &res,
+	const Resolution& res,
 	const Eigen::VectorXd &Chi)
 {
 	double isoval = 0;
@@ -440,9 +456,9 @@ double compute_isovalue(
 	{
 		xy2sq(GV, res, V(i, 0), V(i, 1), sq);
 
-		double x_bottom_chi = lin_interp(GV(sq(0, 0), 1), Chi(sq(0, 0)), GV(sq(0, 1), 1), Chi(sq(0, 1)), V(i, 1));
-		double x_top_chi = lin_interp(GV(sq(1, 0), 1), Chi(sq(1, 0)), GV(sq(1, 1), 1), Chi(sq(1, 1)), V(i, 1));
-		double chi = lin_interp(GV(sq(0, 0), 0), x_bottom_chi, GV(sq(1, 0), 0), x_top_chi, V(i, 0));
+		double x_bottom_chi = lin_interp(GV(sq(0, 0), 0), Chi(sq(0, 0)), GV(sq(0, 1), 0), Chi(sq(0, 1)), V(i, 0));
+		double x_top_chi = lin_interp(GV(sq(1, 0), 0), Chi(sq(1, 0)), GV(sq(1, 1), 0), Chi(sq(1, 1)), V(i, 0));
+		double chi = lin_interp(GV(sq(0, 0), 1), x_bottom_chi, GV(sq(1, 0), 1), x_top_chi, V(i, 1));
 
 		isoval += chi;
 	}
