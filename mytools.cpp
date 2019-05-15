@@ -130,6 +130,16 @@ bool vertex_ij2idx(const Resolution& res, const int xIdx, const int yIdx, size_t
 	return true;
 }
 
+// Get vertex id from resolution and indices - 3D version
+bool vertex_ijk2idx(const Resolution& res, const int xIdx, const int yIdx, const int zIdx, size_t& idx)
+{
+	if (yIdx >= res.y || xIdx >= res.x || zIdx >= res.z || yIdx < 0 || xIdx < 0 || zIdx < 0)
+		return false;
+
+	idx = zIdx * res.x * res.y + yIdx * res.x + xIdx;
+	return true;
+}
+
 
 // Get indices of vertices of containing square
 // x and y are position of any point in space
@@ -150,7 +160,7 @@ void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, con
 
 void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Resolution& res)
 {
-	const size_t extra_layers = 10;	// applied on each side
+	const size_t extra_layers = 5;	// applied on each side
 
 	// find bounding area
 	Eigen::RowVector3d BBmin = V.colwise().minCoeff();
@@ -178,10 +188,6 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 	tmpRes += 2 * extra_layers * Eigen::RowVector3i::Ones(3);
 	// Adjust min (starting point of grid) to account for the added layers
 	BBmin -= Eigen::RowVector3d::Constant(step * (double)extra_layers);
-
-	// Fix to 2D - remove this later
-	tmpRes(2) = 1; 
-	BBmin(2) = V.col(2).minCoeff();
 
 	res.x = tmpRes(0);
 	res.y = tmpRes(1);
@@ -214,6 +220,17 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 
 }
 
+// should this take a full list index or x,y,x indices?
+//void get_grid_neighbours(const Eigen::MatrixXd& GV, const Resolution& res, const size_t idx, Eigen::VectorXi neighbourIdx)
+//{
+//
+//}
+
+// separate functions for returning neighbours in each dimension?
+
+
+
+
 void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::SparseMatrix<double>& L)
 {
 	// ONLY SUPPORTS 2D GRID
@@ -228,7 +245,7 @@ void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::Spar
 	// so the neighbours of n are: n-1, n+1 (on same column), n-y, n+y (on same row)
 
 	// reserve space for 5 non-zero elements on each row
-	L.reserve(Eigen::VectorXi::Constant(m, 5));
+	L.reserve(Eigen::VectorXi::Constant(m, 9));
 
 	for (int idx = 0; idx < m; idx++)
 	{
@@ -238,7 +255,9 @@ void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::Spar
 		bool onUpperEdgeX = false;
 		bool onLowerEdgeY = false;
 		bool onUpperEdgeY = false;
-		int neighbourCount = 4;
+		bool onLowerEdgeZ = false;
+		bool onUpperEdgeZ = false;
+		int neighbourCount = 8;
 
 		if (idx < res.x)
 		{
@@ -262,22 +281,24 @@ void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::Spar
 			neighbourCount -= 1;
 		}
 		
+		if (idx < res.x * res.y)
+		{
+			onLowerEdgeZ = true;
+			neighbourCount -= 1;
+		}
+		else if ((idx >= m - (res.x * res.y)))
+		{
+			onUpperEdgeZ = true;
+			neighbourCount -= 1;
+		}
+
+
 		double coeff = 1.0 / (double)neighbourCount;
 	
 
 		// add diag
 		L.insert(idx, idx) = -1;
 		// add neighbours
-		if (!onLowerEdgeY)
-		{
-			L.insert(idx, idx - res.x) = coeff;
-		}
-
-		if (!onUpperEdgeY)
-		{
-			L.insert(idx, idx + res.x) = coeff;
-		}
-
 		if (!onLowerEdgeX)
 		{
 			L.insert(idx, idx - 1) = coeff;
@@ -288,6 +309,26 @@ void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::Spar
 			L.insert(idx, idx + 1) = coeff;
 		}
 
+		if (!onLowerEdgeY)
+		{
+			L.insert(idx, idx - res.x) = coeff;
+		}
+
+		if (!onUpperEdgeY)
+		{
+			L.insert(idx, idx + res.x) = coeff;
+		}
+
+
+		if (!onLowerEdgeZ)
+		{
+			L.insert(idx, idx - res.x * res.y) = coeff;
+		}
+
+		if (!onUpperEdgeZ)
+		{
+			L.insert(idx, idx + res.x * res.y) = coeff;
+		}
 
 	}
 
@@ -298,12 +339,14 @@ void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::Spar
 
 void construct_divergence(const Resolution& res,
 							Eigen::SparseMatrix<double, Eigen::RowMajor>& Dx,
-							Eigen::SparseMatrix<double, Eigen::RowMajor>& Dy)
+							Eigen::SparseMatrix<double, Eigen::RowMajor>& Dy,
+							Eigen::SparseMatrix<double, Eigen::RowMajor>& Dz)
 {
 	// ONLY SUPPORTS 2D GRID
-	int m = res.x * res.y;
+	int m = res.x * res.y * res.z;
 	Dx.resize(m, m);	// is 'resize' actually required here?
 	Dy.resize(m, m);
+	Dz.resize(m, m);
 	// because it's a regular grid, we don't need to look for neighbours
 	// note that the grid is built by iterating through z, then y, then x
 	// for a 2D grid vith a list of vertices V, the indices (in grid form) are:
@@ -315,11 +358,13 @@ void construct_divergence(const Resolution& res,
 	// reserve space for 2 non-zero elements on each row
 	Dx.reserve(2 * m);
 	Dy.reserve(2 * m);
+	Dz.reserve(2 * m);
 
 	for (int idx = 0; idx < m; idx++)
 	{
 		bool onUpperEdgeX = false;
 		bool onUpperEdgeY = false;
+		bool onUpperEdgeZ = false;
 		//int neighbourCount = 2;
 
 		if (idx >= m - res.x)
@@ -330,27 +375,35 @@ void construct_divergence(const Resolution& res,
 		{
 			onUpperEdgeX = true;
 		}
-
+		if ((idx >= m - (res.x * res.y)))
+		{
+			onUpperEdgeZ = true;
+		}
 
 		// add diag
-		// -2 for all, assumes that value is zero on 'virtual' neighbouring points off the grid
-		// one -1 is in Dx, one in Dy
+		// -3 for all, assumes that value is zero on 'virtual' neighbouring points off the grid
+		// one -3 is in Dx, one in Dy, one in Dz
 		Dx.insert(idx, idx) = -1.0;
 		Dy.insert(idx, idx) = -1.0;
 		// add neighbours
+		if (!onUpperEdgeX)
+		{
+			Dx.insert(idx, idx + 1) = 1.0;
+		}
 		if (!onUpperEdgeY)
 		{
 			Dy.insert(idx, idx + res.x) = 1.0;
 		}
-		if (!onUpperEdgeX)
+		if (!onUpperEdgeZ)
 		{
-			Dx.insert(idx, idx + 1) = 1.0;
+			Dz.insert(idx, idx + res.x * res.y) = 1.0;
 		}
 
 	}
 
 	Dx.makeCompressed();
 	Dy.makeCompressed();
+	Dz.makeCompressed();
 
 }
 
@@ -375,9 +428,6 @@ void compute_grid_normals(
 		//std::cout << searchPointIdx << "\n";
 		Eigen::RowVector3d searchPoint = V.row(searchPointIdx);
 
-		// set K nearest samples
-		//const size_t k = 4;		// TODO CHANGE THIS TO DO RADIUS SEARCH
-
 		// create a query object
 		std::vector<size_t> neighbourIdx(k);
 		std::vector<double> distsSqr(k);
@@ -387,8 +437,8 @@ void compute_grid_normals(
 
 		// find neighbours
 		mat_index.index->findNeighbors(knnSearchResult, searchPoint.data(), nanoflann::SearchParams(50));
-		//Eigen::MatrixXd V_nn(neighbourIdx.size(), 3);
-		Eigen::Vector4d weights;
+
+		Eigen::VectorXd weights(k);
 		for (size_t i = 0; i < neighbourIdx.size(); i++)
 		{
 			//double weight = 1.0 / distsSqr[i];
@@ -437,6 +487,95 @@ void conv2d(const Eigen::MatrixXd &M, const Eigen::MatrixXd &K, const Resolution
 				}
 		}
 }
+
+
+// M is a list of the normal vectors that will be smoothed
+// K is the pre-calculated smoothing kernel in 1D - it will be applied to each dimension
+// CHECK why results seem to be large - should be normalised (as long as K is)
+void conv3d(const Eigen::MatrixXd& M, const Eigen::VectorXd& K, const Resolution& res, Eigen::MatrixXd& MK)
+{
+	MK = Eigen::MatrixXd(M);
+	Eigen::MatrixXd MK_tmp = Eigen::MatrixXd::Zero(M.rows(), M.cols());
+
+	// Apply in x dimension
+	for (size_t xIdx = 0; xIdx < res.x; xIdx++)
+	{
+		for (size_t yIdx = 0; yIdx < res.y; yIdx++)
+		{
+			for (size_t zIdx = 0; zIdx < res.z; zIdx++)
+			{
+				size_t o;
+				if (!vertex_ijk2idx(res, xIdx, yIdx, zIdx, o))
+				{
+					std::cout << "ERROR: Invalid vertex indices!!!\n";
+					return;
+				}
+				for (size_t ik = 0; ik < K.rows(); ik++)
+				{
+					int xIdx_NB = xIdx + ik - K.rows() / 2;
+					size_t neigh;
+					bool valid_neigh = vertex_ijk2idx(res, xIdx_NB, yIdx, zIdx, neigh);
+					if (valid_neigh)
+						MK_tmp.row(o) += K(ik) * MK.row(neigh);
+				}
+			}
+		}
+	}
+	MK = MK_tmp;
+
+	// Apply in y dimension
+	for (size_t xIdx = 0; xIdx < res.x; xIdx++)
+	{
+		for (size_t yIdx = 0; yIdx < res.y; yIdx++)
+		{
+			for (size_t zIdx = 0; zIdx < res.z; zIdx++)
+			{
+				size_t o;
+				if (!vertex_ijk2idx(res, xIdx, yIdx, zIdx, o))
+				{
+					std::cout << "ERROR: Invalid vertex indices!!!\n";
+					return;
+				}
+				for (size_t ik = 0; ik < K.rows(); ik++)
+				{
+					int yIdx_NB = yIdx + ik - K.rows() / 2;
+					size_t neigh;
+					bool valid_neigh = vertex_ijk2idx(res, xIdx, yIdx_NB, zIdx, neigh);
+					if (valid_neigh)
+						MK_tmp.row(o) += K(ik) * MK.row(neigh);
+				}
+			}
+		}
+	}
+	MK = MK_tmp;
+
+	// Apply in z dimension
+	for (size_t xIdx = 0; xIdx < res.x; xIdx++)
+	{
+		for (size_t yIdx = 0; yIdx < res.y; yIdx++)
+		{
+			for (size_t zIdx = 0; zIdx < res.z; zIdx++)
+			{
+				size_t o;
+				if (!vertex_ijk2idx(res, xIdx, yIdx, zIdx, o))
+				{
+					std::cout << "ERROR: Invalid vertex indices!!!\n";
+					return;
+				}
+				for (size_t ik = 0; ik < K.rows(); ik++)
+				{
+					int zIdx_NB = zIdx + ik - K.rows() / 2;
+					size_t neigh;
+					bool valid_neigh = vertex_ijk2idx(res, xIdx, yIdx, zIdx_NB, neigh);
+					if (valid_neigh)
+						MK_tmp.row(o) += K(ik) * MK.row(neigh);
+				}
+			}
+		}
+	}
+	MK = MK_tmp;
+}
+
 
 double lin_interp(const double lx, const double lv, const double rx, const double rv, const double x)
 {

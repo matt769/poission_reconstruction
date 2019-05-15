@@ -22,9 +22,12 @@ void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::Spar
 
 void construct_divergence(const Resolution& res,
 	Eigen::SparseMatrix<double, Eigen::RowMajor>& Dx,
-	Eigen::SparseMatrix<double, Eigen::RowMajor>& Dy);
+	Eigen::SparseMatrix<double, Eigen::RowMajor>& Dy,
+	Eigen::SparseMatrix<double, Eigen::RowMajor>& Dz);
 
 void conv2d(const Eigen::MatrixXd &M, const Eigen::MatrixXd &K, const Resolution& res, Eigen::MatrixXd &MK);
+
+void conv3d(const Eigen::MatrixXd& M, const Eigen::VectorXd& K, const Resolution& res, Eigen::MatrixXd& MK);
 
 void compute_grid_normals(
 	const Eigen::MatrixXd &V,
