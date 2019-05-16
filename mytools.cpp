@@ -182,6 +182,38 @@ void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, con
 }
 
 
+
+void xyz2cube(const Eigen::MatrixXd& GV, const Resolution& res, const double x, const double y, const double z, std::vector<Eigen::Matrix<size_t, 2, 2>>& cube)
+{
+
+	cube.clear();
+
+	const double cell_sz = (GV.col(0).maxCoeff() - GV.col(0).minCoeff()) / (res.x - 1);
+	int xIdx = (int)((x - GV.col(0).minCoeff()) / cell_sz);
+	int yIdx = (int)((y - GV.col(1).minCoeff()) / cell_sz);
+	int zIdx = (int)((z - GV.col(2).minCoeff()) / cell_sz);
+
+	Eigen::Matrix<size_t, 2, 2> square;
+
+	vertex_ijk2idx(res, xIdx, yIdx, zIdx, square(0, 0));
+	vertex_ijk2idx(res, xIdx + 1, yIdx, zIdx, square(0, 1));
+	vertex_ijk2idx(res, xIdx, yIdx + 1, zIdx, square(1, 0));
+	vertex_ijk2idx(res, xIdx + 1, yIdx + 1, zIdx, square(1, 1));
+	cube.push_back(square);
+
+	vertex_ijk2idx(res, xIdx, yIdx, zIdx + 1, square(0, 0));
+	vertex_ijk2idx(res, xIdx + 1, yIdx, zIdx + 1, square(0, 1));
+	vertex_ijk2idx(res, xIdx, yIdx + 1, zIdx + 1, square(1, 0));
+	vertex_ijk2idx(res, xIdx + 1, yIdx + 1, zIdx + 1, square(1, 1));
+	cube.push_back(square);
+
+
+}
+
+
+
+
+
 void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Resolution& res)
 {
 	const size_t extra_layers = 3;	// applied on each side
@@ -576,14 +608,20 @@ double compute_isovalue(
 	const Eigen::VectorXd &Chi)
 {
 	double isoval = 0;
-	Eigen::Matrix<size_t, 2, 2> sq;
+	std::vector<Eigen::Matrix<size_t, 2, 2>> cube;
 	for (size_t i = 0; i < V.rows(); i++)
 	{
-		xy2sq(GV, res, V(i, 0), V(i, 1), sq);
+		xyz2cube(GV, res, V(i, 0), V(i, 1), V(i, 2), cube);
+		std::vector<double> chi_xy;
+		for (Eigen::Matrix<size_t, 2, 2> sq : cube)
+		{
+			double x_bottom_chi = lin_interp(GV(sq(0, 0), 0), Chi(sq(0, 0)), GV(sq(0, 1), 0), Chi(sq(0, 1)), V(i, 0));
+			double x_top_chi = lin_interp(GV(sq(1, 0), 0), Chi(sq(1, 0)), GV(sq(1, 1), 0), Chi(sq(1, 1)), V(i, 0));
+			chi_xy.push_back(lin_interp(GV(sq(0, 0), 1), x_bottom_chi, GV(sq(1, 0), 1), x_top_chi, V(i, 1)));
+		}
 
-		double x_bottom_chi = lin_interp(GV(sq(0, 0), 0), Chi(sq(0, 0)), GV(sq(0, 1), 0), Chi(sq(0, 1)), V(i, 0));
-		double x_top_chi = lin_interp(GV(sq(1, 0), 0), Chi(sq(1, 0)), GV(sq(1, 1), 0), Chi(sq(1, 1)), V(i, 0));
-		double chi = lin_interp(GV(sq(0, 0), 1), x_bottom_chi, GV(sq(1, 0), 1), x_top_chi, V(i, 1));
+		double chi = lin_interp(GV(cube[0](0, 0), 2), chi_xy[0], GV(cube[1](0, 0), 2), chi_xy[1], V(i, 2));
+
 
 		isoval += chi;
 	}

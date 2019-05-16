@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
 	//std::cout << "V:\n" << V << "\n";
 
 
-	int depth = 4;
+	int depth = 5;
 	Eigen::MatrixXd GV;
 	Eigen::MatrixXi GE;
 	Resolution gridResolution;
@@ -233,14 +233,14 @@ int main(int argc, char *argv[])
 	std::cout << "x min, max:\n" << x.minCoeff() << "," << x.maxCoeff() << "\n";
 
 	//// Calculate isovalue that will be used in marching cubes
-	//double isoval = compute_isovalue(V, GV, gridResolution, x);
-	//std::cout << "isoval: " << isoval << "\n";
+	double isoval = compute_isovalue(V, GV, gridResolution, x);
+	std::cout << "isoval: " << isoval << "\n";
 
 	// Run igl marching cubes  ************************************************************************************
 	Eigen::MatrixXd MC_V;
 	Eigen::MatrixXi MC_F;
-	//igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, isoval, MC_V, MC_F);
-	igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, -0.1, MC_V, MC_F);
+	igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, isoval, MC_V, MC_F);
+	//igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, -0.1, MC_V, MC_F);
 
 	
 	////std::cout << "MC_V:\n" << MC_V << "\n";
