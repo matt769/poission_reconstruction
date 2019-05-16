@@ -3,10 +3,27 @@
 
 struct Resolution
 {
-	size_t x;
-	size_t y;
-	size_t z;
+	int x;
+	int y;
+	int z;
+	Resolution()
+	{
+		x = 0;
+		y = 0;
+		z = 0;
+	}
+	Resolution(int xn, int yn, int zn) {
+		x = xn;
+		y = yn;
+		z = zn;
+	}
+	Resolution operator +(const Resolution b) {
+		return Resolution(x + b.x, y + b.y, z + b.z);
+	}
+
 };
+
+
 
 
 void get_example_mesh(std::string const meshname, Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::MatrixXd& VN);

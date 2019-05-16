@@ -3,6 +3,7 @@
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <igl/octree.h>
 #include <igl/copyleft/marching_cubes.h>
+#include <igl/jet.h>
 #include <imgui/imgui.h>
 #include <iostream>
 #include <random>
@@ -28,12 +29,15 @@ public:
 	Eigen::MatrixXd m_DGV;
 	Eigen::MatrixXd m_MC_V;
 	Eigen::MatrixXi m_MC_F;
+	Resolution res;
 
 	float nv_len;
 	float point_size;
 	float line_width;
+	int layer_no;
+	bool enable_MC_faces;
 
-	MyContext() :nv_len(0), point_size(5), line_width(1)
+	MyContext() :nv_len(0), point_size(5), line_width(1), layer_no(-1), enable_MC_faces(false)
 	{
 
 	}
@@ -63,20 +67,49 @@ public:
 		// show grid
 		//viewer.data().add_points(m_GV, Eigen::RowVector3d(0, 255, 0));
 
+
+		//Eigen::MatrixXd indicatorColours = Eigen::MatrixXd::Zero(m_GV.rows(), 3);
+		//indicatorColours.col(2) = m_X - Eigen::VectorXd::Constant(m_X.size(), m_X.minCoeff());
+		//indicatorColours.col(2) /= indicatorColours.col(2).maxCoeff();
+		//indicatorColours.col(0) = indicatorColours.col(2);
+		
+		Eigen::MatrixXd indicatorColours;
+		igl::jet(m_X, true, indicatorColours);
+
+		switch (layer_no)
+		{
+		case -2:
+			break;
+		case -1:
+			viewer.data().add_points(m_GV, indicatorColours);
+			break;
+		default:
+			viewer.data().add_points(m_GV.block(res.x * res.y * layer_no, 0, res.x * res.y, 3),
+						indicatorColours.block(res.x * res.y * layer_no, 0, res.x * res.y, 3));
+			break;
+		}
+
+
+
+
 		// show normals at grid points
-		m_GNend = m_GV + m_GN;
-		viewer.data().add_edges(m_GV, m_GNend, Eigen::RowVector3d(0, 0, 255));
+		//m_GNend = m_GV + m_GN;
+		//viewer.data().add_edges(m_GV, m_GNend, Eigen::RowVector3d(0, 0, 255));
 
 		// show coloured grid points according to indicator values
-		Eigen::MatrixXd indicatorColours = Eigen::MatrixXd::Zero(m_GV.rows(), 3);
-		indicatorColours.col(2) = m_X - Eigen::VectorXd::Constant(m_X.size(), m_X.minCoeff());
-		indicatorColours.col(2) /= indicatorColours.col(2).maxCoeff();
-		indicatorColours.col(0) = indicatorColours.col(2);
-		viewer.data().add_points(m_GV, indicatorColours);
+		//Eigen::MatrixXd indicatorColours = Eigen::MatrixXd::Zero(m_GV.rows(), 3);
+		//indicatorColours.col(2) = m_X - Eigen::VectorXd::Constant(m_X.size(), m_X.minCoeff());
+		//indicatorColours.col(2) /= indicatorColours.col(2).maxCoeff();
+		//indicatorColours.col(0) = indicatorColours.col(2);
+		//viewer.data().add_points(m_GV, indicatorColours);
 
 		// Add marching cube output
-		viewer.data().add_points(m_MC_V, Eigen::RowVector3d(0, 255, 0));
-
+		//viewer.data().add_points(m_MC_V, Eigen::RowVector3d(0, 255, 0));
+		if (enable_MC_faces)
+		{
+			viewer.data().set_mesh(m_MC_V, m_MC_F);
+		}
+		
 	}
 
 private:
@@ -156,8 +189,8 @@ int main(int argc, char *argv[])
 	//// construct Laplacian   ************************************************************************************
 	Eigen::SparseMatrix<double> L;
 	construct_laplacian(gridResolution, GV, L);
-	std::cout << "Laplacian:" << L.rows() << "," << L.cols() << "\n";
-	////std::cout << "L:\n" << L << "\n";
+	//std::cout << "Laplacian:" << L.rows() << "," << L.cols() << "\n";
+	//std::cout << "L:\n" << L << "\n";
 
 
 	//// construct Divergence   ************************************************************************************
@@ -165,12 +198,12 @@ int main(int argc, char *argv[])
 	Eigen::SparseMatrix<double, Eigen::RowMajor> Dy;
 	Eigen::SparseMatrix<double, Eigen::RowMajor> Dz;
 	construct_divergence(gridResolution, Dx, Dy, Dz);
-	////std::cout << "Divergence X:" << Dx.rows() << "," << Dx.cols() << "\n";
-	////std::cout << "Dx:\n" << Dx << "\n";
-	////std::cout << "Divergence Y:" << Dx.rows() << "," << Dy.cols() << "\n";
-	////std::cout << "Dy:\n" << Dy << "\n";
-	////std::cout << "Divergence Z:" << Dz.rows() << "," << Dz.cols() << "\n";
-	////std::cout << "Dz:\n" << Dz << "\n";
+	//std::cout << "Divergence X:" << Dx.rows() << "," << Dx.cols() << "\n";
+	//std::cout << "Dx:\n" << Dx << "\n";
+	//std::cout << "Divergence Y:" << Dx.rows() << "," << Dy.cols() << "\n";
+	//std::cout << "Dy:\n" << Dy << "\n";
+	//std::cout << "Divergence Z:" << Dz.rows() << "," << Dz.cols() << "\n";
+	//std::cout << "Dz:\n" << Dz << "\n";
 	Eigen::MatrixXd DGV = (Dx * weightedNormals.col(0)) + (Dy * weightedNormals.col(1)) + (Dz * weightedNormals.col(2));
 	////std::cout << DGV << std::endl;
 
@@ -224,6 +257,7 @@ int main(int argc, char *argv[])
 	g_myctx.m_X = x;
 	g_myctx.m_MC_V = MC_V;
 	g_myctx.m_MC_F = MC_F;
+	g_myctx.res = gridResolution;
 
 	//------------------------------------------
 	// Init the viewer
@@ -306,13 +340,18 @@ int main(int argc, char *argv[])
 			viewer.data().line_width = g_myctx.line_width;
 		}
 
-		// number of eigen vectors
-		// [event handle] if value changed
-		//if (ImGui::InputInt("num_eig", &g_myctx.num_eig))
-		//{
-		//	std::cout << "num_eig changed\n";
-		//	g_myctx.reset_display(viewer);
-		//}
+		// layer of grid being displayed
+		if (ImGui::InputInt("layer number", &g_myctx.layer_no))
+		{
+			std::cout << "layer number changed\n";
+			g_myctx.reset_display(viewer);
+		}
+
+		if (ImGui::Checkbox("Enable MC faces", &g_myctx.enable_MC_faces))
+		{
+			std::cout << "MC face option changed\n";
+			g_myctx.reset_display(viewer);
+		}
 
 		ImGui::End();
 	};

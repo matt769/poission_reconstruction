@@ -130,6 +130,8 @@ bool vertex_ij2idx(const Resolution& res, const int xIdx, const int yIdx, size_t
 	return true;
 }
 
+
+
 // Get vertex id from resolution and indices - 3D version
 bool vertex_ijk2idx(const Resolution& res, const int xIdx, const int yIdx, const int zIdx, size_t& idx)
 {
@@ -139,6 +141,28 @@ bool vertex_ijk2idx(const Resolution& res, const int xIdx, const int yIdx, const
 	idx = zIdx * res.x * res.y + yIdx * res.x + xIdx;
 	return true;
 }
+
+bool vertex_ijk2idx(const Resolution& res, const Resolution& xyz, size_t& idx)
+{
+	return vertex_ijk2idx(res, xyz.x, xyz.y, xyz.z, idx);
+}
+
+
+bool vertex_idx2ijk(const Resolution& res, const size_t idx, Resolution& xyz)
+{
+	if (idx > res.x*res.y*res.z)
+		return false;
+
+
+	xyz.x = idx % res.x;
+	xyz.y = (idx / res.x) % res.y;
+	xyz.z = idx / res.x / res.y;
+	return true;
+}
+
+
+
+
 
 
 // Get indices of vertices of containing square
@@ -160,7 +184,7 @@ void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, con
 
 void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Resolution& res)
 {
-	const size_t extra_layers = 5;	// applied on each side
+	const size_t extra_layers = 3;	// applied on each side
 
 	// find bounding area
 	Eigen::RowVector3d BBmin = V.colwise().minCoeff();
@@ -251,86 +275,45 @@ void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::Spar
 	{
 		// note that idx is the vertex index, and the row index of the laplacian
 		// and there are res.x-1 squares on the x side
-		bool onLowerEdgeX = false;
-		bool onUpperEdgeX = false;
-		bool onLowerEdgeY = false;
-		bool onUpperEdgeY = false;
-		bool onLowerEdgeZ = false;
-		bool onUpperEdgeZ = false;
-		int neighbourCount = 8;
-
-		if (idx < res.x)
+		Resolution xyz;
+		if (!vertex_idx2ijk(res, idx, xyz))
 		{
-			onLowerEdgeY = true;
-			neighbourCount -= 1;
-		}
-		else if (idx >= m - res.x)
-		{
-			onUpperEdgeY = true;
-			neighbourCount -= 1;
+			std::cout << "Invalid index\n";
+			return;
 		}
 
-		if (idx % res.x == 0)
-		{
-			onLowerEdgeX = true;
-			neighbourCount -= 1;
-		}
-		else if ((idx + 1) % res.x == 0)
-		{
-			onUpperEdgeX = true;
-			neighbourCount -= 1;
-		}
-		
-		if (idx < res.x * res.y)
-		{
-			onLowerEdgeZ = true;
-			neighbourCount -= 1;
-		}
-		else if ((idx >= m - (res.x * res.y)))
-		{
-			onUpperEdgeZ = true;
-			neighbourCount -= 1;
-		}
+		const Resolution offsets[6] = { {0, 0, -1}, {0, 0, 1}, {0, -1, 0}, {0, 1, 0}, {-1, 0, 0}, {1, 0, 0} };
 
+
+		int neighbourCount = 0;
+		for (int offsetIdx = 0; offsetIdx < 6; offsetIdx++)
+		{
+			size_t nIdx;
+			if (!vertex_ijk2idx(res, xyz + offsets[offsetIdx], nIdx))
+			{
+				continue;
+			}
+
+			neighbourCount++;
+
+		}
 
 		double coeff = 1.0 / (double)neighbourCount;
-	
+		L.insert(idx, idx) = -1.0;
 
-		// add diag
-		L.insert(idx, idx) = -1;
-		// add neighbours
-		if (!onLowerEdgeX)
+		for (int offsetIdx = 0; offsetIdx < 6; offsetIdx++)
 		{
-			L.insert(idx, idx - 1) = coeff;
+			size_t nIdx;
+			if (!vertex_ijk2idx(res, xyz + offsets[offsetIdx], nIdx))
+			{
+				continue;
+			}
+
+			L.insert(idx, nIdx) = coeff;
+
 		}
-
-		if (!onUpperEdgeX)
-		{
-			L.insert(idx, idx + 1) = coeff;
-		}
-
-		if (!onLowerEdgeY)
-		{
-			L.insert(idx, idx - res.x) = coeff;
-		}
-
-		if (!onUpperEdgeY)
-		{
-			L.insert(idx, idx + res.x) = coeff;
-		}
-
-
-		if (!onLowerEdgeZ)
-		{
-			L.insert(idx, idx - res.x * res.y) = coeff;
-		}
-
-		if (!onUpperEdgeZ)
-		{
-			L.insert(idx, idx + res.x * res.y) = coeff;
-		}
-
 	}
+
 
 	L.makeCompressed();
 
@@ -362,49 +345,52 @@ void construct_divergence(const Resolution& res,
 
 	for (int idx = 0; idx < m; idx++)
 	{
-		bool onUpperEdgeX = false;
-		bool onUpperEdgeY = false;
-		bool onUpperEdgeZ = false;
-		//int neighbourCount = 2;
 
-		if (idx >= m - res.x)
+		Resolution xyz;
+		if (!vertex_idx2ijk(res, idx, xyz))
 		{
-			onUpperEdgeY = true;
-		}
-		if ((idx + 1) % res.x == 0)
-		{
-			onUpperEdgeX = true;
-		}
-		if ((idx >= m - (res.x * res.y)))
-		{
-			onUpperEdgeZ = true;
+			std::cout << "Invalid index\n";
+			return;
 		}
 
-		// add diag
-		// -3 for all, assumes that value is zero on 'virtual' neighbouring points off the grid
-		// one -3 is in Dx, one in Dy, one in Dz
+		const Resolution offsets[3] = { {0, 0, 1}, {0, 1, 0}, {1, 0, 0} };
+
 		Dx.insert(idx, idx) = -1.0;
 		Dy.insert(idx, idx) = -1.0;
-		// add neighbours
-		if (!onUpperEdgeX)
+		Dz.insert(idx, idx) = -1.0;
+
+		for (int offsetIdx = 0; offsetIdx < 3; offsetIdx++)
 		{
-			Dx.insert(idx, idx + 1) = 1.0;
-		}
-		if (!onUpperEdgeY)
-		{
-			Dy.insert(idx, idx + res.x) = 1.0;
-		}
-		if (!onUpperEdgeZ)
-		{
-			Dz.insert(idx, idx + res.x * res.y) = 1.0;
+			size_t nIdx;
+			if (!vertex_ijk2idx(res, xyz + offsets[offsetIdx], nIdx))
+			{
+				continue;
+			}
+
+			switch (offsetIdx)
+			{
+			case 0:
+				Dz.insert(idx, nIdx) = 1.0;
+				break;
+			case 1:
+				Dy.insert(idx, nIdx) = 1.0;
+				break;
+			case 2:
+				Dx.insert(idx, nIdx) = 1.0;
+				break;
+			default:
+				break;
+			}
+
 		}
 
+		// -3 for all, assumes that value is zero on 'virtual' neighbouring points off the grid
+		// one -3 is in Dx, one in Dy, one in Dz
 	}
 
 	Dx.makeCompressed();
 	Dy.makeCompressed();
 	Dz.makeCompressed();
-
 }
 
 void compute_grid_normals(
