@@ -139,31 +139,39 @@ bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
 
 int main(int argc, char *argv[])
 {
-	//time_t timeNow;
-	//timeNow = std::time(NULL);
-	//std::cout << "Start time:" << timeNow << "\n";
+	time_t timeStart;
+	timeStart = std::time(NULL);
+	std::cout << "Start time:" << timeStart << "\n";
 
 	// load data  ************************************************************************************
 	std::cout << "Loading point data\n";
 	Eigen::MatrixXd V;
 	Eigen::MatrixXd N;
+	Eigen::MatrixXi F;
 	//get_point_data("circle.obj", V, N);
-	get_point_data("sphere.obj", V, N);
+	//get_point_data("sphere.obj", V, N);
 	//get_point_data("circle_noisy.obj", V, N);
 	//get_point_data("circle_noisy2.obj", V, N);
 	//get_point_data("circle_gap.obj", V, N);
+
+	get_example_mesh("bunny.obj", V, F, N);
+
+	// Need to fix the normals to be pointing inside
+	N = -N; // this may not fix all of them *****
+
+
 	//std::cout << "Sample vertices:" << V.rows() << "\n";
 	//std::cout << "V:\n" << V << "\n";
 
 	// create grid ************************************************************************************
 	std::cout << "Creating grid\n";
-	int depth = 3;
+	int depth = 4;
 	Eigen::MatrixXd GV;
 	Eigen::MatrixXi GE;
 	Resolution gridResolution;
 	get_grid(V, depth, GV, GE, gridResolution);
 	
-	//std::cout << "Grid vertices:" << GV.rows() << "\n";
+	std::cout << "Grid vertices:" << GV.rows() << "\n";
 	//std::cout << "GV:\n" << GV << "\n";
 	//std::cout << "Grid resolution: " << gridResolution.x << ", " << gridResolution.y << ", " << gridResolution.z << "\n";
 
@@ -227,24 +235,24 @@ int main(int argc, char *argv[])
 	//// Solve Poisson equation  ************************************************************************************
 	std::cout << "Solving Poisson equation\n";
 	//// Solve system Lx = DGV
-	//Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
-	Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> solver;
 	Eigen::VectorXd x;
+	
+	solve_poisson_equation(L, DGV, x);
 
-	////std::cout << "L" << '\n';
-	////std::cout << L << '\n';
-	////std::cout << "DGV" << '\n';
-	////std::cout << DGV << '\n';
+	////Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
+	//Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> solver;
+
+	//solver.compute(L);
+	//if (solver.info() != Eigen::Success) {
+	//	std::cout << "Decomposition failed\n";
+	//}
+	//x = -solver.solve(DGV);
+	//if (solver.info() != Eigen::Success) {
+	//	std::cout << "Solving failed\n";
+	//}
 
 
-	solver.compute(L);
-	if (solver.info() != Eigen::Success) {
-		std::cout << "Decomposition failed\n";
-	}
-	x = -solver.solve(DGV);
-	if (solver.info() != Eigen::Success) {
-		std::cout << "Solving failed\n";
-	}
+
 	std::cout << "x min, max:\n" << x.minCoeff() << "," << x.maxCoeff() << "\n";
 
 	//// Calculate isovalue that will be used in marching cubes
@@ -266,6 +274,10 @@ int main(int argc, char *argv[])
 
 
 	std::cout << "Finished calculations\n";
+	time_t timeEnd;
+	timeEnd = std::time(NULL);
+	std::cout << "End time:" << timeEnd << "\n";
+	std::cout << "Elapsed time:" << timeEnd - timeStart << "\n";
 
 	//------------------------------------------
 	// for visualization

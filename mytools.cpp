@@ -4,8 +4,8 @@
 #include <igl/file_exists.h>
 #include <igl/octree.h>
 #include "nanoflann.hpp"
-//#include <Eigen/Dense> // why not directly required? already included from igl above?
-//#include <Eigen/Sparse>
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
 
 #include "mytools.h"
 
@@ -44,7 +44,6 @@ void get_example_mesh(std::string const meshname, Eigen::MatrixXd& V, Eigen::Mat
 
 }
 
-// Is there really no way to just get point data only?
 void get_point_data(std::string const meshname, Eigen::MatrixXd& V)
 {
 	Eigen::MatrixXi F;
@@ -78,6 +77,8 @@ void get_point_data(std::string const meshname, Eigen::MatrixXd& V)
 	}
 
 }
+
+
 
 void get_point_data(std::string const meshname, Eigen::MatrixXd& V, Eigen::MatrixXd& N)
 {
@@ -118,6 +119,7 @@ void get_point_data(std::string const meshname, Eigen::MatrixXd& V, Eigen::Matri
 	}
 
 }
+
 
 
 // Get vertex id from resolution and indices
@@ -577,6 +579,27 @@ void conv3d(const Eigen::MatrixXd& M, const Eigen::VectorXd& K, const Resolution
 	}
 	MK = MK_tmp;
 }
+
+
+bool solve_poisson_equation(const Eigen::SparseMatrix<double> L , const Eigen::MatrixXd DGV, Eigen::VectorXd& x)
+{
+	bool success = true;
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> solver;
+
+	solver.compute(L);
+	if (solver.info() != Eigen::Success) {
+		success = false;
+		std::cout << "Decomposition failed\n";
+	}
+	x = -solver.solve(DGV);
+	if (solver.info() != Eigen::Success) {
+		success = false;
+		std::cout << "Solving failed\n";
+	}
+
+	return success;
+}
+
 
 
 double lin_interp(const double lx, const double lv, const double rx, const double rv, const double x)

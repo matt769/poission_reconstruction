@@ -28,7 +28,6 @@ struct Resolution
 
 void get_example_mesh(std::string const meshname, Eigen::MatrixXd& V, Eigen::MatrixXi& F, Eigen::MatrixXd& VN);
 
-// Is there really no way to just get point data only?
 void get_point_data(std::string const meshname, Eigen::MatrixXd& V);
 
 void get_point_data(std::string const meshname, Eigen::MatrixXd& V, Eigen::MatrixXd& N);
@@ -76,6 +75,8 @@ void compute_grid_normals(
 	const Eigen::MatrixXd &GV,
 	const size_t k,
 	Eigen::MatrixXd &weightedNormals);
+
+bool solve_poisson_equation(const Eigen::SparseMatrix<double> L, const Eigen::MatrixXd DGV, Eigen::VectorXd& x);
 
 double compute_isovalue(
 	const Eigen::MatrixXd &V,
