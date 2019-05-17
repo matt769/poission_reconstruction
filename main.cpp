@@ -7,6 +7,7 @@
 #include <imgui/imgui.h>
 #include <iostream>
 #include <random>
+//#include <ctime>
 
 #include "nanoflann.hpp"
 #include "mytools.h"
@@ -36,8 +37,10 @@ public:
 	float line_width;
 	int layer_no;
 	bool enable_MC_faces;
+	bool enable_sample_normals;
+	bool enable_grid_normals;
 
-	MyContext() :nv_len(0), point_size(5), line_width(1), layer_no(-1), enable_MC_faces(false)
+	MyContext() :nv_len(0), point_size(5), line_width(1), layer_no(-1), enable_MC_faces(false), enable_sample_normals(false)
 	{
 
 	}
@@ -60,48 +63,50 @@ public:
 		viewer.data().clear();
 		viewer.data().add_points(m_V, Eigen::RowVector3d(255, 0, 0));
 
-		// now want to show normals
-		//m_Nend = m_V + m_N;
-		//viewer.data().add_edges(m_V, m_Nend, Eigen::RowVector3d(0, 0, 255));
+		// show sample normals
+		if (enable_sample_normals)
+		{
+			m_Nend = m_V + m_N;
+			viewer.data().add_edges(m_V, m_Nend, Eigen::RowVector3d(0, 0, 255));
+		}
+
 
 		// show grid
 		//viewer.data().add_points(m_GV, Eigen::RowVector3d(0, 255, 0));
-
-
-		//Eigen::MatrixXd indicatorColours = Eigen::MatrixXd::Zero(m_GV.rows(), 3);
-		//indicatorColours.col(2) = m_X - Eigen::VectorXd::Constant(m_X.size(), m_X.minCoeff());
-		//indicatorColours.col(2) /= indicatorColours.col(2).maxCoeff();
-		//indicatorColours.col(0) = indicatorColours.col(2);
 		
 		Eigen::MatrixXd indicatorColours;
 		igl::jet(m_X, true, indicatorColours);
 
 		switch (layer_no)
 		{
+		case -3:
+			layer_no = -2;
 		case -2:
 			break;
 		case -1:
 			viewer.data().add_points(m_GV, indicatorColours);
 			break;
 		default:
-			viewer.data().add_points(m_GV.block(res.x * res.y * layer_no, 0, res.x * res.y, 3),
-						indicatorColours.block(res.x * res.y * layer_no, 0, res.x * res.y, 3));
+			if (layer_no < res.z)
+			{
+
+				viewer.data().add_points(m_GV.block(res.x * res.y * layer_no, 0, res.x * res.y, 3),
+					indicatorColours.block(res.x * res.y * layer_no, 0, res.x * res.y, 3));
+			}
+			else {
+				layer_no = res.z - 1;
+			}
 			break;
 		}
 
 
-
-
 		// show normals at grid points
-		//m_GNend = m_GV + m_GN;
-		//viewer.data().add_edges(m_GV, m_GNend, Eigen::RowVector3d(0, 0, 255));
+		if (enable_grid_normals)
+		{
+			m_GNend = m_GV + m_GN;
+			viewer.data().add_edges(m_GV, m_GNend, Eigen::RowVector3d(0, 0, 255));
+		}
 
-		// show coloured grid points according to indicator values
-		//Eigen::MatrixXd indicatorColours = Eigen::MatrixXd::Zero(m_GV.rows(), 3);
-		//indicatorColours.col(2) = m_X - Eigen::VectorXd::Constant(m_X.size(), m_X.minCoeff());
-		//indicatorColours.col(2) /= indicatorColours.col(2).maxCoeff();
-		//indicatorColours.col(0) = indicatorColours.col(2);
-		//viewer.data().add_points(m_GV, indicatorColours);
 
 		// Add marching cube output
 		//viewer.data().add_points(m_MC_V, Eigen::RowVector3d(0, 255, 0));
@@ -134,7 +139,12 @@ bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
 
 int main(int argc, char *argv[])
 {
+	//time_t timeNow;
+	//timeNow = std::time(NULL);
+	//std::cout << "Start time:" << timeNow << "\n";
+
 	// load data  ************************************************************************************
+	std::cout << "Loading point data\n";
 	Eigen::MatrixXd V;
 	Eigen::MatrixXd N;
 	//get_point_data("circle.obj", V, N);
@@ -145,8 +155,9 @@ int main(int argc, char *argv[])
 	//std::cout << "Sample vertices:" << V.rows() << "\n";
 	//std::cout << "V:\n" << V << "\n";
 
-
-	int depth = 5;
+	// create grid ************************************************************************************
+	std::cout << "Creating grid\n";
+	int depth = 3;
 	Eigen::MatrixXd GV;
 	Eigen::MatrixXi GE;
 	Resolution gridResolution;
@@ -156,15 +167,17 @@ int main(int argc, char *argv[])
 	//std::cout << "GV:\n" << GV << "\n";
 	//std::cout << "Grid resolution: " << gridResolution.x << ", " << gridResolution.y << ", " << gridResolution.z << "\n";
 
-	//// interpolate normals to grid points   *******************************************************************
-	//// for now, find all within some distance, and treat all equally (unweighted average)
+	// interpolate normals to grid points   *******************************************************************
+	std::cout << "Spread normals to grid points\n";
+	// for now, find all within some distance, and treat all equally (unweighted average)
 	Eigen::MatrixXd weightedNormals;
 	compute_grid_normals(V, N, GV, 8, weightedNormals);
-	////std::cout << "Grid normals:" << weightedNormals.rows() << "\n";
-	////std::cout << "GN:\n" << weightedNormals << "\n";
+	//std::cout << "Grid normals:" << weightedNormals.rows() << "\n";
+	//std::cout << "GN:\n" << weightedNormals << "\n";
 
 
-
+	// Apply smoothing filter to normals   *******************************************************************
+	std::cout << "Applying smoothing filter\n";
 	Eigen::MatrixXd VF;
 	//Eigen::Matrix3d K;
 	//K << 9, 57, 9,
@@ -179,7 +192,6 @@ int main(int argc, char *argv[])
 
 	// Apply (approximation of) gaussian smoother
 	//conv2d(weightedNormals, K, gridResolution, VF);
-
 	conv3d(weightedNormals, K, gridResolution, VF);
 	weightedNormals = VF;
 	////std::cout << "Grid normals after convolution:\n" << weightedNormals << "\n";
@@ -187,6 +199,7 @@ int main(int argc, char *argv[])
 
 
 	//// construct Laplacian   ************************************************************************************
+	std::cout << "Constructing Laplacian\n";
 	Eigen::SparseMatrix<double> L;
 	construct_laplacian(gridResolution, GV, L);
 	//std::cout << "Laplacian:" << L.rows() << "," << L.cols() << "\n";
@@ -194,6 +207,7 @@ int main(int argc, char *argv[])
 
 
 	//// construct Divergence   ************************************************************************************
+	std::cout << "Constructing divergence\n";
 	Eigen::SparseMatrix<double, Eigen::RowMajor> Dx;
 	Eigen::SparseMatrix<double, Eigen::RowMajor> Dy;
 	Eigen::SparseMatrix<double, Eigen::RowMajor> Dz;
@@ -211,6 +225,7 @@ int main(int argc, char *argv[])
 
 
 	//// Solve Poisson equation  ************************************************************************************
+	std::cout << "Solving Poisson equation\n";
 	//// Solve system Lx = DGV
 	//Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> solver;
@@ -233,10 +248,12 @@ int main(int argc, char *argv[])
 	std::cout << "x min, max:\n" << x.minCoeff() << "," << x.maxCoeff() << "\n";
 
 	//// Calculate isovalue that will be used in marching cubes
+	std::cout << "Computing isovalue\n";
 	double isoval = compute_isovalue(V, GV, gridResolution, x);
 	std::cout << "isoval: " << isoval << "\n";
 
 	// Run igl marching cubes  ************************************************************************************
+	std::cout << "Running marching cubes\n";
 	Eigen::MatrixXd MC_V;
 	Eigen::MatrixXi MC_F;
 	igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, isoval, MC_V, MC_F);
@@ -247,6 +264,8 @@ int main(int argc, char *argv[])
 	////std::cout << "MC_V size: " << MC_V.rows() << ", " << MC_V.cols() << "\n";
 	//
 
+
+	std::cout << "Finished calculations\n";
 
 	//------------------------------------------
 	// for visualization
@@ -350,6 +369,18 @@ int main(int argc, char *argv[])
 		if (ImGui::Checkbox("Enable MC faces", &g_myctx.enable_MC_faces))
 		{
 			std::cout << "MC face option changed\n";
+			g_myctx.reset_display(viewer);
+		}
+
+		if (ImGui::Checkbox("Enable sample normals", &g_myctx.enable_sample_normals))
+		{
+			std::cout << "Sample normals option changed\n";
+			g_myctx.reset_display(viewer);
+		}
+
+		if (ImGui::Checkbox("Enable grid normals", &g_myctx.enable_grid_normals))
+		{
+			std::cout << "Grid normals option changed\n";
 			g_myctx.reset_display(viewer);
 		}
 

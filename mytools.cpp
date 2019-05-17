@@ -131,7 +131,6 @@ bool vertex_ij2idx(const Resolution& res, const int xIdx, const int yIdx, size_t
 }
 
 
-
 // Get vertex id from resolution and indices - 3D version
 bool vertex_ijk2idx(const Resolution& res, const int xIdx, const int yIdx, const int zIdx, size_t& idx)
 {
@@ -162,9 +161,6 @@ bool vertex_idx2ijk(const Resolution& res, const size_t idx, Resolution& xyz)
 
 
 
-
-
-
 // Get indices of vertices of containing square
 // x and y are position of any point in space
 void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, const double y, Eigen::Matrix<size_t, 2, 2> &square)
@@ -180,7 +176,6 @@ void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, con
 	vertex_ij2idx(res, xIdx, yIdx + 1, square(1, 0));
 	vertex_ij2idx(res, xIdx + 1, yIdx + 1, square(1, 1));
 }
-
 
 
 void xyz2cube(const Eigen::MatrixXd& GV, const Resolution& res, const double x, const double y, const double z, std::vector<Eigen::Matrix<size_t, 2, 2>>& cube)
@@ -209,8 +204,6 @@ void xyz2cube(const Eigen::MatrixXd& GV, const Resolution& res, const double x, 
 
 
 }
-
-
 
 
 
@@ -275,15 +268,6 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 
 
 }
-
-// should this take a full list index or x,y,x indices?
-//void get_grid_neighbours(const Eigen::MatrixXd& GV, const Resolution& res, const size_t idx, Eigen::VectorXi neighbourIdx)
-//{
-//
-//}
-
-// separate functions for returning neighbours in each dimension?
-
 
 
 
