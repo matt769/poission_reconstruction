@@ -40,7 +40,7 @@ public:
 	bool enable_sample_normals;
 	bool enable_grid_normals;
 
-	MyContext() :nv_len(0), point_size(5), line_width(1), layer_no(-1), enable_MC_faces(false), enable_sample_normals(false)
+	MyContext() :nv_len(0), point_size(5), line_width(1), layer_no(-1), enable_MC_faces(false), enable_sample_normals(false), enable_grid_normals(false)
 	{
 
 	}
