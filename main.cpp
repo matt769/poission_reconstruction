@@ -112,7 +112,14 @@ public:
 		//viewer.data().add_points(m_MC_V, Eigen::RowVector3d(0, 255, 0));
 		if (enable_MC_faces)
 		{
-			viewer.data().set_mesh(m_MC_V, m_MC_F);
+			if (res.z == 1)
+			{
+				viewer.data().add_points(m_MC_V, Eigen::RowVector3d(0, 255, 0));
+			}
+			else
+			{
+				viewer.data().set_mesh(m_MC_V, m_MC_F);
+			}
 		}
 		
 	}
@@ -170,7 +177,7 @@ int main(int argc, char *argv[])
 	Resolution gridResolution;
 	get_grid(V, depth, GV, GE, gridResolution);
 	
-	std::cout << "Grid vertices:" << GV.rows() << "\n";
+	//std::cout << "Grid vertices:" << GV.rows() << "\n";
 	//std::cout << "GV:\n" << GV << "\n";
 	//std::cout << "Grid resolution: " << gridResolution.x << ", " << gridResolution.y << ", " << gridResolution.z << "\n";
 
@@ -263,13 +270,27 @@ int main(int argc, char *argv[])
 	std::cout << "Running marching cubes\n";
 	Eigen::MatrixXd MC_V;
 	Eigen::MatrixXi MC_F;
-	igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, isoval, MC_V, MC_F);
-	//igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, -0.1, MC_V, MC_F);
+
+	if (gridResolution.z == 1)
+	{
+		Eigen::VectorXd x_3d(2 * x.rows());
+		x_3d.block(0, 0, x.rows(), 1) = x;
+		x_3d.block(x.rows(), 0, x.rows(), 1) = Eigen::VectorXd::Constant(x.rows(), x.maxCoeff());
+		Eigen::MatrixXd GV_3d(2 * GV.rows(), GV.cols());
+		GV_3d.block(0, 0, GV.rows(), GV.cols()) = GV;
+		GV_3d.block(GV.rows(), 0, GV.rows(), GV.cols()) = GV;
+
+		igl::copyleft::marching_cubes(x_3d, GV_3d, gridResolution.x, gridResolution.y, gridResolution.z+1, isoval, MC_V, MC_F);
+	}
+	else
+	{
+		igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, isoval, MC_V, MC_F);
+	}
 
 	
-	////std::cout << "MC_V:\n" << MC_V << "\n";
-	////std::cout << "MC_V size: " << MC_V.rows() << ", " << MC_V.cols() << "\n";
-	//
+	//std::cout << "MC_V:\n" << MC_V << "\n";
+	//std::cout << "MC_V size: " << MC_V.rows() << ", " << MC_V.cols() << "\n";
+	
 
 
 	std::cout << "Finished calculations\n";

@@ -243,12 +243,15 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 	tmpRes += 2 * Eigen::RowVector3i::Ones(3);
 	// Add extra layers (each side)
 	tmpRes += 2 * extra_layers * Eigen::RowVector3i::Ones(3);
+
+	// Adjust min (starting point of grid) to account for the added layers
+	BBmin -= Eigen::RowVector3d::Constant(step * (double)extra_layers);
+
 	if (twoD)
 	{
 		tmpRes(2) = 1;
+		BBmin(2) = 0.0;
 	}
-	// Adjust min (starting point of grid) to account for the added layers
-	BBmin -= Eigen::RowVector3d::Constant(step * (double)extra_layers);
 
 	res.x = tmpRes(0);
 	res.y = tmpRes(1);
@@ -626,6 +629,7 @@ double compute_isovalue_3d(
 	return isoval;
 }
 
+
 double compute_isovalue_2d(
 	const Eigen::MatrixXd& V,
 	const Eigen::MatrixXd& GV,
@@ -633,26 +637,21 @@ double compute_isovalue_2d(
 	const Eigen::VectorXd& Chi)
 {
 	double isoval = 0;
-	std::vector<Eigen::Matrix<size_t, 2, 2>> cube;
+	Eigen::Matrix<size_t, 2, 2> sq;
 	for (size_t i = 0; i < V.rows(); i++)
 	{
-		xyz2cube(GV, res, V(i, 0), V(i, 1), V(i, 2), cube);
-		std::vector<double> chi_xy;
-		for (Eigen::Matrix<size_t, 2, 2> sq : cube)
-		{
-			double x_bottom_chi = lin_interp(GV(sq(0, 0), 0), Chi(sq(0, 0)), GV(sq(0, 1), 0), Chi(sq(0, 1)), V(i, 0));
-			double x_top_chi = lin_interp(GV(sq(1, 0), 0), Chi(sq(1, 0)), GV(sq(1, 1), 0), Chi(sq(1, 1)), V(i, 0));
-			chi_xy.push_back(lin_interp(GV(sq(0, 0), 1), x_bottom_chi, GV(sq(1, 0), 1), x_top_chi, V(i, 1)));
-		}
+		xy2sq(GV, res, V(i, 0), V(i, 1), sq);
 
-		double chi = lin_interp(GV(cube[0](0, 0), 2), chi_xy[0], GV(cube[1](0, 0), 2), chi_xy[1], V(i, 2));
-
+		double x_bottom_chi = lin_interp(GV(sq(0, 0), 0), Chi(sq(0, 0)), GV(sq(0, 1), 0), Chi(sq(0, 1)), V(i, 0));
+		double x_top_chi = lin_interp(GV(sq(1, 0), 0), Chi(sq(1, 0)), GV(sq(1, 1), 0), Chi(sq(1, 1)), V(i, 0));
+		double chi = lin_interp(GV(sq(0, 0), 1), x_bottom_chi, GV(sq(1, 0), 1), x_top_chi, V(i, 1));
 
 		isoval += chi;
 	}
 	isoval /= V.rows();
 	return isoval;
 }
+
 
 double compute_isovalue(
 	const Eigen::MatrixXd& V,
