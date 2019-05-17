@@ -465,3 +465,50 @@ double compute_isovalue(
 	isoval /= V.rows();
 	return isoval;
 }
+
+void compute_normals(const Eigen::MatrixXd& V, Eigen::MatrixXd& N)
+{
+	N.resize(V.rows(), V.cols());
+	double r_max = V.col(0).maxCoeff();
+	for (size_t i = 0; i < V.rows(); i++)
+	{
+		Eigen::RowVector3d v1 = V.row((i + 1) % V.rows()) - V.row(i);
+		Eigen::RowVector3d n1;
+		n1(0) = 1;
+		n1(1) = -v1(0) / v1(1);
+		n1(2) = 0;
+		n1.normalize();
+		if (abs(v1(0)) < 0.000001)
+		{
+			if (abs(V(i, 0) - r_max) < 0.000001)
+				n1 = -n1;
+		}
+		else
+		{
+			if (v1(1) < 0)
+				n1 = -n1;
+		}
+
+		Eigen::RowVector3d v2 = V.row(i) - V.row((i - 1 + V.rows()) % V.rows());
+		Eigen::RowVector3d n2;
+		n2(0) = 1;
+		n2(1) = -v2(0) / v2(1);
+		n2(2) = 0;
+		n2.normalize();
+
+
+		if (abs(v2(0)) < 0.000001)
+		{
+			if (abs(V(i, 0) - r_max) < 0.000001)
+				n2 = -n2;
+		}
+		else
+		{
+			if (v2(1) < 0)
+				n2 = -n2;
+		}
+
+		N.row(i) = n1 + n2;
+		N.row(i).normalize();
+	}
+}

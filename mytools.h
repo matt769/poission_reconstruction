@@ -39,6 +39,8 @@ double compute_isovalue(
 	const Resolution& res,
 	const Eigen::VectorXd &Chi);
 
+void compute_normals(const Eigen::MatrixXd& V, Eigen::MatrixXd& N);
+
 #endif
 
 

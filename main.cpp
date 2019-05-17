@@ -71,7 +71,7 @@ public:
 		
 		// show normals at grid points
 		m_GNend = m_GV + m_GN;
-		viewer.data().add_edges(m_GV, m_GNend, Eigen::RowVector3d(0, 0, 255));
+		//viewer.data().add_edges(m_GV, m_GNend, Eigen::RowVector3d(0, 0, 255));
 
 		// show coloured grid points according to indicator values
 		Eigen::MatrixXd indicatorColours = Eigen::MatrixXd::Zero(m_GV.rows(), 3);
@@ -115,15 +115,25 @@ bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
 
 int main(int argc, char *argv[])
 {
+
 	// load data  ************************************************************************************
 	Eigen::MatrixXd V;
 	Eigen::MatrixXd N;
-	get_point_data("circle.obj", V, N);
+	//get_point_data("circle.obj", V, N);
 	//get_point_data("circle_noisy.obj", V, N);
 	//get_point_data("circle_noisy2.obj", V, N);
 	//get_point_data("circle_gap.obj", V, N);
+
+	get_point_data("ext2.obj", V);
+
+
+
 	//std::cout << "Sample vertices:" << V.rows() << "\n";
 	//std::cout << "V:\n" << V << "\n";
+
+	compute_normals(V, N);
+
+
 
 	std::vector<std::vector<double>> GV_oct;
 	Eigen::MatrixXi CH;
@@ -135,7 +145,7 @@ int main(int argc, char *argv[])
 
 
 
-	int depth = 5;
+	int depth = 4;
 	Eigen::MatrixXd GV;
 	Eigen::MatrixXi GE;
 	Resolution gridResolution;
