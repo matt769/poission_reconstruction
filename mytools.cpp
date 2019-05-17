@@ -123,14 +123,14 @@ void get_point_data(std::string const meshname, Eigen::MatrixXd& V, Eigen::Matri
 
 
 // Get vertex id from resolution and indices
-bool vertex_ij2idx(const Resolution& res, const int xIdx, const int yIdx, size_t &idx)
-{
-	if (yIdx >= res.y || xIdx >= res.x || yIdx < 0 || xIdx < 0)
-		return false;
-
-	idx = yIdx * res.x + xIdx;
-	return true;
-}
+//bool vertex_ij2idx(const Resolution& res, const int xIdx, const int yIdx, size_t &idx)
+//{
+//	if (yIdx >= res.y || xIdx >= res.x || yIdx < 0 || xIdx < 0)
+//		return false;
+//
+//	idx = yIdx * res.x + xIdx;
+//	return true;
+//}
 
 
 // Get vertex id from resolution and indices - 3D version
@@ -173,10 +173,10 @@ void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, con
 	int xIdx = (int)((x - GV.col(0).minCoeff()) / cell_sz);
 	int yIdx = (int)((y - GV.col(1).minCoeff()) / cell_sz);
 
-	vertex_ij2idx(res, xIdx, yIdx, square(0, 0));
-	vertex_ij2idx(res, xIdx + 1, yIdx, square(0, 1));
-	vertex_ij2idx(res, xIdx, yIdx + 1, square(1, 0));
-	vertex_ij2idx(res, xIdx + 1, yIdx + 1, square(1, 1));
+	vertex_ijk2idx(res, xIdx, yIdx, 0, square(0, 0));
+	vertex_ijk2idx(res, xIdx + 1, yIdx, 0, square(0, 1));
+	vertex_ijk2idx(res, xIdx, yIdx + 1, 0, square(1, 0));
+	vertex_ijk2idx(res, xIdx + 1, yIdx + 1, 0, square(1, 1));
 }
 
 
@@ -218,6 +218,12 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 	Eigen::RowVector3d BBmax = V.colwise().maxCoeff();
 	Eigen::RowVector3d BBrange = BBmax - BBmin;
 
+	bool twoD = false;
+	if (abs(BBrange(2)) < 0.00000001)
+	{
+		twoD = true;
+	}
+
 	/*const Eigen::RowVector3d adjBB = BBrange;
 	BBmin -= adjBB;
 	BBmax += adjBB;
@@ -237,6 +243,10 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 	tmpRes += 2 * Eigen::RowVector3i::Ones(3);
 	// Add extra layers (each side)
 	tmpRes += 2 * extra_layers * Eigen::RowVector3i::Ones(3);
+	if (twoD)
+	{
+		tmpRes(2) = 1;
+	}
 	// Adjust min (starting point of grid) to account for the added layers
 	BBmin -= Eigen::RowVector3d::Constant(step * (double)extra_layers);
 
@@ -275,7 +285,7 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 
 void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::SparseMatrix<double>& L)
 {
-	// ONLY SUPPORTS 2D GRID
+
 	int m = GV.rows();
 	L.resize(m, m);
 	// because it's a regular grid, we don't need to look for neighbours
@@ -473,38 +483,10 @@ void compute_grid_normals(
 
 
 
-// Only works if M and K are 2D
-void conv2d(const Eigen::MatrixXd &M, const Eigen::MatrixXd &K, const Resolution& res, Eigen::MatrixXd &MK)
-{
-	MK = Eigen::MatrixXd::Zero(M.rows(), M.cols());
-	//std::cout << "In conv2d...\n";
-	for (size_t yIdx = 0; yIdx < res.y; yIdx++)
-		for (size_t xIdx = 0; xIdx < res.x; xIdx++)
-		{
-			size_t o;
-			if (!vertex_ij2idx(res, xIdx, yIdx, o))
-			{
-				std::cout << "ERROR: Invalid vertex indices!!!\n";
-				return;
-			}
-			for (size_t ik = 0; ik < K.rows(); ik++)
-				for (size_t jk = 0; jk < K.cols(); jk++)
-				{
-					int xIdx_NB = xIdx + ik - K.rows() / 2;
-					int yIdx_NB = yIdx + jk - K.cols() / 2;
-					size_t neigh;
-					bool valid_neigh = vertex_ij2idx(res, xIdx_NB, yIdx_NB, neigh);
-					if (valid_neigh)
-						MK.row(o) += K(ik, jk) * M.row(neigh);
-				}
-		}
-}
-
-
 // M is a list of the normal vectors that will be smoothed
 // K is the pre-calculated smoothing kernel in 1D - it will be applied to each dimension
 // CHECK why results seem to be large - should be normalised (as long as K is)
-void conv3d(const Eigen::MatrixXd& M, const Eigen::VectorXd& K, const Resolution& res, Eigen::MatrixXd& MK)
+void apply_convolution(const Eigen::MatrixXd& M, const Eigen::VectorXd& K, const Resolution& res, Eigen::MatrixXd& MK)
 {
 	MK = Eigen::MatrixXd(M);
 	Eigen::MatrixXd MK_tmp = Eigen::MatrixXd::Zero(M.rows(), M.cols());
@@ -616,7 +598,7 @@ double lin_interp(const double lx, const double lv, const double rx, const doubl
 }
 
 
-double compute_isovalue(
+double compute_isovalue_3d(
 	const Eigen::MatrixXd &V,
 	const Eigen::MatrixXd &GV,
 	const Resolution& res,
@@ -642,4 +624,49 @@ double compute_isovalue(
 	}
 	isoval /= V.rows();
 	return isoval;
+}
+
+double compute_isovalue_2d(
+	const Eigen::MatrixXd& V,
+	const Eigen::MatrixXd& GV,
+	const Resolution& res,
+	const Eigen::VectorXd& Chi)
+{
+	double isoval = 0;
+	std::vector<Eigen::Matrix<size_t, 2, 2>> cube;
+	for (size_t i = 0; i < V.rows(); i++)
+	{
+		xyz2cube(GV, res, V(i, 0), V(i, 1), V(i, 2), cube);
+		std::vector<double> chi_xy;
+		for (Eigen::Matrix<size_t, 2, 2> sq : cube)
+		{
+			double x_bottom_chi = lin_interp(GV(sq(0, 0), 0), Chi(sq(0, 0)), GV(sq(0, 1), 0), Chi(sq(0, 1)), V(i, 0));
+			double x_top_chi = lin_interp(GV(sq(1, 0), 0), Chi(sq(1, 0)), GV(sq(1, 1), 0), Chi(sq(1, 1)), V(i, 0));
+			chi_xy.push_back(lin_interp(GV(sq(0, 0), 1), x_bottom_chi, GV(sq(1, 0), 1), x_top_chi, V(i, 1)));
+		}
+
+		double chi = lin_interp(GV(cube[0](0, 0), 2), chi_xy[0], GV(cube[1](0, 0), 2), chi_xy[1], V(i, 2));
+
+
+		isoval += chi;
+	}
+	isoval /= V.rows();
+	return isoval;
+}
+
+double compute_isovalue(
+	const Eigen::MatrixXd& V,
+	const Eigen::MatrixXd& GV,
+	const Resolution& res,
+	const Eigen::VectorXd& Chi)
+{
+	if (res.z == 1)
+	{
+		return compute_isovalue_2d(V, GV, res, Chi);
+	}
+	else
+	{
+		return compute_isovalue_3d(V, GV, res, Chi);
+	}
+
 }

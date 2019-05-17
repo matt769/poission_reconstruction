@@ -148,16 +148,15 @@ int main(int argc, char *argv[])
 	Eigen::MatrixXd V;
 	Eigen::MatrixXd N;
 	Eigen::MatrixXi F;
-	//get_point_data("circle.obj", V, N);
+	get_point_data("circle.obj", V, N);
 	//get_point_data("sphere.obj", V, N);
 	//get_point_data("circle_noisy.obj", V, N);
 	//get_point_data("circle_noisy2.obj", V, N);
 	//get_point_data("circle_gap.obj", V, N);
 
-	get_example_mesh("bunny.obj", V, F, N);
-
-	// Need to fix the normals to be pointing inside
-	N = -N; // this may not fix all of them *****
+	//get_example_mesh("bunny.obj", V, F, N);
+	//// Need to fix the normals to be pointing inside
+	//N = -N; // this may not fix all of them *****
 
 
 	//std::cout << "Sample vertices:" << V.rows() << "\n";
@@ -200,7 +199,7 @@ int main(int argc, char *argv[])
 
 	// Apply (approximation of) gaussian smoother
 	//conv2d(weightedNormals, K, gridResolution, VF);
-	conv3d(weightedNormals, K, gridResolution, VF);
+	apply_convolution(weightedNormals, K, gridResolution, VF);
 	weightedNormals = VF;
 	////std::cout << "Grid normals after convolution:\n" << weightedNormals << "\n";
 	////std::cout << weightedNormals << "\n";

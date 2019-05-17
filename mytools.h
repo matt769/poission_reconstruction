@@ -34,7 +34,7 @@ void get_point_data(std::string const meshname, Eigen::MatrixXd& V, Eigen::Matri
 
 
 
-bool vertex_ij2idx(const Resolution& res, const int xIdx, const int yIdx, size_t& idx);
+//bool vertex_ij2idx(const Resolution& res, const int xIdx, const int yIdx, size_t& idx);
 
 // Get vertex id from resolution and indices - 3D version
 bool vertex_ijk2idx(const Resolution& res, const int xIdx, const int yIdx, const int zIdx, size_t& idx);
@@ -65,9 +65,7 @@ void construct_divergence(const Resolution& res,
 	Eigen::SparseMatrix<double, Eigen::RowMajor>& Dy,
 	Eigen::SparseMatrix<double, Eigen::RowMajor>& Dz);
 
-void conv2d(const Eigen::MatrixXd &M, const Eigen::MatrixXd &K, const Resolution& res, Eigen::MatrixXd &MK);
-
-void conv3d(const Eigen::MatrixXd& M, const Eigen::VectorXd& K, const Resolution& res, Eigen::MatrixXd& MK);
+void apply_convolution(const Eigen::MatrixXd& M, const Eigen::VectorXd& K, const Resolution& res, Eigen::MatrixXd& MK);
 
 void compute_grid_normals(
 	const Eigen::MatrixXd &V,
@@ -78,11 +76,23 @@ void compute_grid_normals(
 
 bool solve_poisson_equation(const Eigen::SparseMatrix<double> L, const Eigen::MatrixXd DGV, Eigen::VectorXd& x);
 
-double compute_isovalue(
+double compute_isovalue_3d(
 	const Eigen::MatrixXd &V,
 	const Eigen::MatrixXd &GV,
 	const Resolution& res,
 	const Eigen::VectorXd &Chi);
+
+double compute_isovalue_2d(
+	const Eigen::MatrixXd& V,
+	const Eigen::MatrixXd& GV,
+	const Resolution& res,
+	const Eigen::VectorXd& Chi);
+
+double compute_isovalue(
+	const Eigen::MatrixXd& V,
+	const Eigen::MatrixXd& GV,
+	const Resolution& res,
+	const Eigen::VectorXd& Chi);
 
 #endif
 
