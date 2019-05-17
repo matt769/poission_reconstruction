@@ -343,7 +343,6 @@ void construct_divergence(const Resolution& res,
 							Eigen::SparseMatrix<double, Eigen::RowMajor>& Dy,
 							Eigen::SparseMatrix<double, Eigen::RowMajor>& Dz)
 {
-	// ONLY SUPPORTS 2D GRID
 	int m = res.x * res.y * res.z;
 	Dx.resize(m, m);	// is 'resize' actually required here?
 	Dy.resize(m, m);
@@ -371,13 +370,13 @@ void construct_divergence(const Resolution& res,
 			return;
 		}
 
-		const Resolution offsets[3] = { {0, 0, 1}, {0, 1, 0}, {1, 0, 0} };
+		const Resolution offsets[6] = { {0, 0, -1}, {0, 0, 1}, {0, -1, 0}, {0, 1, 0}, {-1, 0, 0}, {1, 0, 0} };
 
-		Dx.insert(idx, idx) = -1.0;
-		Dy.insert(idx, idx) = -1.0;
-		Dz.insert(idx, idx) = -1.0;
+		//Dx.insert(idx, idx) = -1.0;
+		//Dy.insert(idx, idx) = -1.0;
+		//Dz.insert(idx, idx) = -1.0;
 
-		for (int offsetIdx = 0; offsetIdx < 3; offsetIdx++)
+		for (int offsetIdx = 0; offsetIdx < 6; offsetIdx++)
 		{
 			size_t nIdx;
 			if (!vertex_ijk2idx(res, xyz + offsets[offsetIdx], nIdx))
@@ -388,13 +387,22 @@ void construct_divergence(const Resolution& res,
 			switch (offsetIdx)
 			{
 			case 0:
-				Dz.insert(idx, nIdx) = 1.0;
+				Dz.insert(idx, nIdx) = -0.5;
 				break;
 			case 1:
-				Dy.insert(idx, nIdx) = 1.0;
+				Dz.insert(idx, nIdx) = 0.5;
 				break;
 			case 2:
-				Dx.insert(idx, nIdx) = 1.0;
+				Dy.insert(idx, nIdx) = -0.5;
+				break;
+			case 3:
+				Dy.insert(idx, nIdx) = 0.5;
+				break;
+			case 4:
+				Dx.insert(idx, nIdx) = -0.5;
+				break;
+			case 5:
+				Dx.insert(idx, nIdx) = 0.5;
 				break;
 			default:
 				break;
