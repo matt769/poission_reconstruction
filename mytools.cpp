@@ -211,7 +211,7 @@ void xyz2cube(const Eigen::MatrixXd& GV, const Resolution& res, const double x, 
 
 void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Resolution& res)
 {
-	const size_t extra_layers = 3;	// applied on each side
+	const size_t extra_layers = 10;	// applied on each side
 
 	// find bounding area
 	Eigen::RowVector3d BBmin = V.colwise().minCoeff();
@@ -668,4 +668,54 @@ double compute_isovalue(
 		return compute_isovalue_3d(V, GV, res, Chi);
 	}
 
+}
+
+void compute_normals(const Eigen::MatrixXd& V, Eigen::MatrixXd& N)
+{
+	N.resize(V.rows(), V.cols());
+	double r_max = V.col(0).maxCoeff();
+	for (size_t i = 0; i < V.rows(); i++)
+	{
+		Eigen::RowVector3d v1 = V.row((i + 1) % V.rows()) - V.row(i);
+		Eigen::RowVector3d n1;
+		n1(0) = 1;
+		n1(1) = -v1(0) / v1(1);
+		n1(2) = 0;
+		n1.normalize();
+		if (abs(v1(0)) < 0.000001)
+		{
+			if (abs(V(i, 0) - r_max) < 0.000001)
+				n1 = -n1;
+		}
+		else
+		{
+			if (v1(1) < 0)
+				n1 = -n1;
+		}
+
+		Eigen::RowVector3d v2 = V.row(i) - V.row((i - 1 + V.rows()) % V.rows());
+		Eigen::RowVector3d n2;
+		n2(0) = 1;
+		n2(1) = -v2(0) / v2(1);
+		n2(2) = 0;
+		n2.normalize();
+
+
+		if (abs(v2(0)) < 0.000001)
+		{
+			if (abs(V(i, 0) - r_max) < 0.000001)
+				n2 = -n2;
+		}
+		else
+		{
+			if (v2(1) < 0)
+				n2 = -n2;
+		}
+
+		N.row(i) = n1 + n2;
+		N.row(i).normalize();
+
+		//if ((i <= 11 && i >= 7) || (i >= 34 && i <= 38))
+		//	N.row(i) *= 4;
+	}
 }

@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
 	Eigen::MatrixXd V;
 	Eigen::MatrixXd N;
 	Eigen::MatrixXi F;
-	get_point_data("circle.obj", V, N);
+	//get_point_data("circle.obj", V, N);
 	//get_point_data("sphere.obj", V, N);
 	//get_point_data("circle_noisy.obj", V, N);
 	//get_point_data("circle_noisy2.obj", V, N);
@@ -165,6 +165,8 @@ int main(int argc, char *argv[])
 	//// Need to fix the normals to be pointing inside
 	//N = -N; // this may not fix all of them *****
 
+	get_point_data("ext2.obj", V);
+	compute_normals(V, N);
 
 	//std::cout << "Sample vertices:" << V.rows() << "\n";
 	//std::cout << "V:\n" << V << "\n";
@@ -265,6 +267,8 @@ int main(int argc, char *argv[])
 	std::cout << "Computing isovalue\n";
 	double isoval = compute_isovalue(V, GV, gridResolution, x);
 	std::cout << "isoval: " << isoval << "\n";
+
+	//isoval = -0.4;
 
 	// Run igl marching cubes  ************************************************************************************
 	std::cout << "Running marching cubes\n";
