@@ -56,7 +56,7 @@ void xyz2cube(const Eigen::MatrixXd& GV,
 
 
 
-void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Resolution& res);
+void get_grid(const Eigen::MatrixXd& V, const int depth, const size_t extra_layers, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Resolution& res);
 
 void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::SparseMatrix<double>& L);
 

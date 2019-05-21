@@ -121,19 +121,7 @@ void get_point_data(std::string const meshname, Eigen::MatrixXd& V, Eigen::Matri
 }
 
 
-
 // Get vertex id from resolution and indices
-//bool vertex_ij2idx(const Resolution& res, const int xIdx, const int yIdx, size_t &idx)
-//{
-//	if (yIdx >= res.y || xIdx >= res.x || yIdx < 0 || xIdx < 0)
-//		return false;
-//
-//	idx = yIdx * res.x + xIdx;
-//	return true;
-//}
-
-
-// Get vertex id from resolution and indices - 3D version
 bool vertex_ijk2idx(const Resolution& res, const int xIdx, const int yIdx, const int zIdx, size_t& idx)
 {
 	if (yIdx >= res.y || xIdx >= res.x || zIdx >= res.z || yIdx < 0 || xIdx < 0 || zIdx < 0)
@@ -143,12 +131,13 @@ bool vertex_ijk2idx(const Resolution& res, const int xIdx, const int yIdx, const
 	return true;
 }
 
+// Takes Resolution object instead of separate x,y,z
 bool vertex_ijk2idx(const Resolution& res, const Resolution& xyz, size_t& idx)
 {
 	return vertex_ijk2idx(res, xyz.x, xyz.y, xyz.z, idx);
 }
 
-
+// Get vertex x,y,z indices (as Resolution object) based on its index in the full list and the grid resolution
 bool vertex_idx2ijk(const Resolution& res, const size_t idx, Resolution& xyz)
 {
 	if (idx > res.x*res.y*res.z)
@@ -167,7 +156,7 @@ bool vertex_idx2ijk(const Resolution& res, const size_t idx, Resolution& xyz)
 // x and y are position of any point in space
 void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, const double y, Eigen::Matrix<size_t, 2, 2> &square)
 {
-	// TODO describe order of indices in 'square'
+	// TODO could do with some explanation
 
 	const double cell_sz = (GV.col(0).maxCoeff() - GV.col(0).minCoeff()) / (res.x - 1);
 	int xIdx = (int)((x - GV.col(0).minCoeff()) / cell_sz);
@@ -183,6 +172,7 @@ void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, con
 void xyz2cube(const Eigen::MatrixXd& GV, const Resolution& res, const double x, const double y, const double z, std::vector<Eigen::Matrix<size_t, 2, 2>>& cube)
 {
 
+	// TODO could do with some explanation
 	cube.clear();
 
 	const double cell_sz = (GV.col(0).maxCoeff() - GV.col(0).minCoeff()) / (res.x - 1);
@@ -209,9 +199,8 @@ void xyz2cube(const Eigen::MatrixXd& GV, const Resolution& res, const double x, 
 
 
 
-void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Resolution& res)
+void get_grid(const Eigen::MatrixXd& V, const int depth, const size_t extra_layers, Eigen::MatrixXd& GV, Eigen::MatrixXi& GE, Resolution& res)
 {
-	const size_t extra_layers = 10;	// applied on each side
 
 	// find bounding area
 	Eigen::RowVector3d BBmin = V.colwise().minCoeff();
@@ -224,11 +213,6 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 		twoD = true;
 	}
 
-	/*const Eigen::RowVector3d adjBB = BBrange;
-	BBmin -= adjBB;
-	BBmax += adjBB;
-	BBrange = BBmax - BBmin;*/
-
 	// create grid (square mesh) across bounding area
 	// think of resolution as the result of multiple equal axis splits
 	// or desired number of vertices along longest side
@@ -240,7 +224,7 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 	// how many *whole* steps cover each side
 	// TODO clean up following few lines
 	Eigen::RowVector3i tmpRes = (BBrange / step).cast<int>();
-	tmpRes += 2 * Eigen::RowVector3i::Ones(3);
+	tmpRes += 2 * Eigen::RowVector3i::Ones(3); // add 2 extra layers to ensure coverage
 	// Add extra layers (each side)
 	tmpRes += 2 * extra_layers * Eigen::RowVector3i::Ones(3);
 
@@ -280,10 +264,7 @@ void get_grid(const Eigen::MatrixXd& V, const int depth, Eigen::MatrixXd& GV, Ei
 
 	// adjust grid so that center matches object center?
 
-
-
 }
-
 
 
 void construct_laplacian(const Resolution& res, Eigen::MatrixXd& GV, Eigen::SparseMatrix<double>& L)
@@ -437,9 +418,9 @@ void compute_grid_normals(
 	const Eigen::MatrixXd &N, 
 	const Eigen::MatrixXd &GV, 
 	const size_t k, 
-	Eigen::MatrixXd &weightedNormals)
+	Eigen::MatrixXd &GN)
 {
-	weightedNormals = Eigen::MatrixXd::Zero(GV.rows(), 3);
+	GN = Eigen::MatrixXd::Zero(GV.rows(), 3);
 
 	Eigen::VectorXd totalWeight = Eigen::VectorXd::Zero(GV.rows());
 	double gridSize = (GV.row(0) - GV.row(1)).norm();
@@ -474,14 +455,14 @@ void compute_grid_normals(
 		weights /= weights.sum();
 		for (size_t i = 0; i < neighbourIdx.size(); i++)
 		{
-			weightedNormals.row(neighbourIdx[i]) += weights(i) * N.row(searchPointIdx);
+			GN.row(neighbourIdx[i]) += weights(i) * N.row(searchPointIdx);
 			totalWeight(neighbourIdx[i]) += weights(i);
 		}
 
 	}
 
-	double maxNormalSize = weightedNormals.rowwise().norm().maxCoeff();
-	weightedNormals = weightedNormals * gridSize / maxNormalSize;
+	double maxNormalSize = GN.rowwise().norm().maxCoeff();
+	GN = GN * gridSize / maxNormalSize;
 }
 
 

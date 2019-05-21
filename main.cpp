@@ -23,9 +23,11 @@ public:
 	Eigen::MatrixXd m_N;
 	Eigen::MatrixXd m_Nend;
 	Eigen::MatrixXd m_GNend;
+	Eigen::MatrixXd m_GN_smoothed_end;
 	Eigen::MatrixXd m_GV;
 	Eigen::MatrixXd m_V_nn;
 	Eigen::MatrixXd m_GN;
+	Eigen::MatrixXd m_GN_smoothed;
 	Eigen::MatrixXd m_X;
 	Eigen::MatrixXd m_DGV;
 	Eigen::MatrixXd m_MC_V;
@@ -38,9 +40,13 @@ public:
 	int layer_no;
 	bool enable_MC_faces;
 	bool enable_sample_normals;
+	bool enable_sample_points;
 	bool enable_grid_normals;
+	bool enable_smoothed_grid_normals;
 
-	MyContext() :nv_len(0), point_size(5), line_width(1), layer_no(-1), enable_MC_faces(false), enable_sample_normals(false), enable_grid_normals(false)
+	MyContext() :nv_len(0), point_size(5), line_width(1), layer_no(-1), 
+					enable_MC_faces(false), enable_sample_normals(false), enable_grid_normals(false), 
+					enable_smoothed_grid_normals(false), enable_sample_points(true)
 	{
 
 	}
@@ -61,7 +67,13 @@ public:
 		viewer.data().point_size = point_size;
 
 		viewer.data().clear();
-		viewer.data().add_points(m_V, Eigen::RowVector3d(255, 0, 0));
+
+		// show sample points
+		if (enable_sample_points)
+		{
+			viewer.data().add_points(m_V, Eigen::RowVector3d(0, 0, 0));
+		}
+
 
 		// show sample normals
 		if (enable_sample_normals)
@@ -105,6 +117,13 @@ public:
 		{
 			m_GNend = m_GV + m_GN;
 			viewer.data().add_edges(m_GV, m_GNend, Eigen::RowVector3d(0, 0, 255));
+		}
+
+		// show smoothed normals at grid points
+		if (enable_smoothed_grid_normals)
+		{
+			m_GN_smoothed_end = m_GV + m_GN_smoothed;
+			viewer.data().add_edges(m_GV, m_GN_smoothed_end, Eigen::RowVector3d(0, 0, 255));
 		}
 
 
@@ -156,14 +175,15 @@ int main(int argc, char *argv[])
 	Eigen::MatrixXd N;
 	Eigen::MatrixXi F;
 	//get_point_data("circle.obj", V, N);
+	//get_point_data("circle_fewpoints.obj", V, N);
 	//get_point_data("sphere.obj", V, N);
 	//get_point_data("circle_noisy.obj", V, N);
 	//get_point_data("circle_noisy2.obj", V, N);
 	//get_point_data("circle_gap.obj", V, N);
 
 	//get_example_mesh("bunny.obj", V, F, N);
-	//// Need to fix the normals to be pointing inside
-	//N = -N; // this may not fix all of them *****
+	//N = -N; // Need to fix the normals to be pointing inside
+	//N /= 5; // And make them a little smaller too (just for viewing, shouldn't affect the result)
 
 	get_point_data("ext2.obj", V);
 	compute_normals(V, N);
@@ -174,10 +194,11 @@ int main(int argc, char *argv[])
 	// create grid ************************************************************************************
 	std::cout << "Creating grid\n";
 	int depth = 4;
+	const size_t extra_layers = 10;
 	Eigen::MatrixXd GV;
 	Eigen::MatrixXi GE;
 	Resolution gridResolution;
-	get_grid(V, depth, GV, GE, gridResolution);
+	get_grid(V, depth, extra_layers, GV, GE, gridResolution);
 	
 	//std::cout << "Grid vertices:" << GV.rows() << "\n";
 	//std::cout << "GV:\n" << GV << "\n";
@@ -185,31 +206,34 @@ int main(int argc, char *argv[])
 
 	// interpolate normals to grid points   *******************************************************************
 	std::cout << "Spread normals to grid points\n";
-	// for now, find all within some distance, and treat all equally (unweighted average)
-	Eigen::MatrixXd weightedNormals;
-	compute_grid_normals(V, N, GV, 8, weightedNormals);
-	//std::cout << "Grid normals:" << weightedNormals.rows() << "\n";
-	//std::cout << "GN:\n" << weightedNormals << "\n";
+	Eigen::MatrixXd GN;
+	size_t numGridPoints; // how many grid points to spread each sample point to
+	if (gridResolution.z == 1) numGridPoints = 4;
+	else numGridPoints = 8;
+	compute_grid_normals(V, N, GV, numGridPoints, GN);
+	//std::cout << "Grid normals:" << GN.rows() << "\n";
+	//std::cout << "GN:\n" << GN << "\n";
 
 
 	// Apply smoothing filter to normals   *******************************************************************
 	std::cout << "Applying smoothing filter\n";
-	Eigen::MatrixXd VF;
-	//Eigen::Matrix3d K;
-	//K << 9, 57, 9,
-	//	57, 361, 57,
-	//	9, 57, 9;
-	//K /= K.sum();
-
+	Eigen::MatrixXd GN_smoothed;
 	Eigen::Vector3d K;
 	K << 9, 57, 9;
+	//Eigen::Matrix<double, 5, 1> K;
+	//K << 7, 26, 41, 26, 7;
+	//Eigen::Matrix<double, 5, 1> K;
+	//K << 1, 1, 1, 1, 1;
+	//Eigen::Matrix<double, 1, 1> K;
+	//K << 1;
 	K /= K.sum();
+	// *** It doesn't seems to make any visual difference to the result
 
 
 	// Apply (approximation of) gaussian smoother
-	//conv2d(weightedNormals, K, gridResolution, VF);
-	apply_convolution(weightedNormals, K, gridResolution, VF);
-	weightedNormals = VF;
+	apply_convolution(GN, K, gridResolution, GN_smoothed);
+	
+	//GN = GN_smoothed;
 	////std::cout << "Grid normals after convolution:\n" << weightedNormals << "\n";
 	////std::cout << weightedNormals << "\n";
 
@@ -234,7 +258,7 @@ int main(int argc, char *argv[])
 	//std::cout << "Dy:\n" << Dy << "\n";
 	//std::cout << "Divergence Z:" << Dz.rows() << "," << Dz.cols() << "\n";
 	//std::cout << "Dz:\n" << Dz << "\n";
-	Eigen::MatrixXd DGV = (Dx * weightedNormals.col(0)) + (Dy * weightedNormals.col(1)) + (Dz * weightedNormals.col(2));
+	Eigen::MatrixXd DGV = (Dx * GN_smoothed.col(0)) + (Dy * GN_smoothed.col(1)) + (Dz * GN_smoothed.col(2));
 	////std::cout << DGV << std::endl;
 
 
@@ -244,22 +268,7 @@ int main(int argc, char *argv[])
 	std::cout << "Solving Poisson equation\n";
 	//// Solve system Lx = DGV
 	Eigen::VectorXd x;
-	
 	solve_poisson_equation(L, DGV, x);
-
-	////Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
-	//Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> solver;
-
-	//solver.compute(L);
-	//if (solver.info() != Eigen::Success) {
-	//	std::cout << "Decomposition failed\n";
-	//}
-	//x = -solver.solve(DGV);
-	//if (solver.info() != Eigen::Success) {
-	//	std::cout << "Solving failed\n";
-	//}
-
-
 
 	std::cout << "x min, max:\n" << x.minCoeff() << "," << x.maxCoeff() << "\n";
 
@@ -308,7 +317,8 @@ int main(int argc, char *argv[])
 	g_myctx.m_V = V;
 	g_myctx.m_N = N;
 	g_myctx.m_GV = GV;
-	g_myctx.m_GN = weightedNormals;
+	g_myctx.m_GN = GN;
+	g_myctx.m_GN_smoothed = GN_smoothed;
 	g_myctx.m_X = x;
 	g_myctx.m_MC_V = MC_V;
 	g_myctx.m_MC_F = MC_F;
@@ -408,6 +418,13 @@ int main(int argc, char *argv[])
 			g_myctx.reset_display(viewer);
 		}
 
+		
+		if (ImGui::Checkbox("Enable sample points", &g_myctx.enable_sample_points))
+		{
+			std::cout << "Sample points option changed\n";
+			g_myctx.reset_display(viewer);
+		}
+
 		if (ImGui::Checkbox("Enable sample normals", &g_myctx.enable_sample_normals))
 		{
 			std::cout << "Sample normals option changed\n";
@@ -417,6 +434,12 @@ int main(int argc, char *argv[])
 		if (ImGui::Checkbox("Enable grid normals", &g_myctx.enable_grid_normals))
 		{
 			std::cout << "Grid normals option changed\n";
+			g_myctx.reset_display(viewer);
+		}
+
+		if (ImGui::Checkbox("Enable smoothed grid normals", &g_myctx.enable_smoothed_grid_normals))
+		{
+			std::cout << "Smoothed grid normals option changed\n";
 			g_myctx.reset_display(viewer);
 		}
 
