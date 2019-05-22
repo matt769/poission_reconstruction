@@ -721,3 +721,37 @@ void faces_to_edges(const Eigen::MatrixXi& F, const Eigen::MatrixXd& V, Eigen::M
 	}
 
 }
+
+void modify_chi(const Eigen::MatrixXd& GV, const Eigen::MatrixXd& V_known, const size_t k, const double isovalue, Eigen::VectorXd& X)
+{
+	// find the grid points near to the vertices that are part of the edges
+	// set their chi value to the isovalue
+	//size_t k = 4;
+	typedef nanoflann::KDTreeEigenMatrixAdaptor< Eigen::MatrixXd >  kd_tree_t;
+	kd_tree_t mat_index(GV, 10 /* max leaf */);
+	mat_index.index->buildIndex();
+
+	for (int searchPointIdx = 0; searchPointIdx < V_known.rows(); searchPointIdx++) {
+		//std::cout << searchPointIdx << "\n";
+		Eigen::RowVector3d searchPoint = V_known.row(searchPointIdx);
+
+		// create a query object
+		std::vector<size_t> neighbourIdx(k);
+		std::vector<double> distsSqr(k);
+
+		nanoflann::KNNResultSet<double> knnSearchResult(k);
+		knnSearchResult.init(neighbourIdx.data(), distsSqr.data());
+
+		// find neighbours
+		mat_index.index->findNeighbors(knnSearchResult, searchPoint.data(), nanoflann::SearchParams(50));
+
+		for (size_t i = 0; i < neighbourIdx.size(); i++)
+		{
+			X(neighbourIdx[i]) = isovalue;
+		}
+
+	}
+
+
+
+}

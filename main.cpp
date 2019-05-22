@@ -305,11 +305,23 @@ int main(int argc, char *argv[])
 		igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, isoval, MC_V, MC_F);
 	}
 
-	
 	//std::cout << "MC_V:\n" << MC_V << "\n";
 	//std::cout << "MC_F:\n" << MC_F << "\n";
 	//std::cout << "MC_V size: " << MC_V.rows() << ", " << MC_V.cols() << "\n";
 	
+	// Try modifying the chi values of points near the known edges
+	//Eigen::MatrixXd V_known(5, 3);
+	////Eigen::MatrixXd V_known(10, 3);
+	//V_known.block(0, 0, 5, 3) = V.block(7, 0, 5, 3);
+	////V_known.block(5, 0, 5, 3) = V.block(34, 0, 5, 3);
+	//size_t k = 2;
+	//modify_chi(GV, V_known, k, isoval, x);
+
+
+
+
+
+
 
 
 	std::cout << "Finished calculations\n";
