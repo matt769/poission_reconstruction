@@ -32,6 +32,9 @@ public:
 	Eigen::MatrixXd m_DGV;
 	Eigen::MatrixXd m_MC_V;
 	Eigen::MatrixXi m_MC_F;
+	Eigen::MatrixXd m_MC_E_start;
+	Eigen::MatrixXd m_MC_E_end;
+
 	Resolution res;
 
 	float nv_len;
@@ -133,7 +136,9 @@ public:
 		{
 			if (res.z == 1)
 			{
+				faces_to_edges(m_MC_F, m_MC_V, m_MC_E_start, m_MC_E_end);
 				viewer.data().add_points(m_MC_V, Eigen::RowVector3d(0, 255, 0));
+				viewer.data().add_edges(m_MC_E_start, m_MC_E_end, Eigen::RowVector3d(0, 255, 0));
 			}
 			else
 			{
@@ -302,6 +307,7 @@ int main(int argc, char *argv[])
 
 	
 	//std::cout << "MC_V:\n" << MC_V << "\n";
+	//std::cout << "MC_F:\n" << MC_F << "\n";
 	//std::cout << "MC_V size: " << MC_V.rows() << ", " << MC_V.cols() << "\n";
 	
 

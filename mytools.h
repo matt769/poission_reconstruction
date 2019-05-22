@@ -96,6 +96,9 @@ double compute_isovalue(
 
 void compute_normals(const Eigen::MatrixXd& V, Eigen::MatrixXd& N);
 
+void faces_to_edges(const Eigen::MatrixXi& F, const Eigen::MatrixXd& V, Eigen::MatrixXd& MC_V_start, Eigen::MatrixXd& MC_V_end);
+
+
 #endif
 
 

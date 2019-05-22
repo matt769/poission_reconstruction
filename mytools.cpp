@@ -700,3 +700,24 @@ void compute_normals(const Eigen::MatrixXd& V, Eigen::MatrixXd& N)
 		//	N.row(i) *= 4;
 	}
 }
+
+
+
+void faces_to_edges(const Eigen::MatrixXi& F, const Eigen::MatrixXd& V, Eigen::MatrixXd& MC_V_start, Eigen::MatrixXd& MC_V_end)
+{
+	MC_V_start = Eigen::MatrixXd(F.rows() * 3, 3);
+	MC_V_end = Eigen::MatrixXd(F.rows() * 3, 3);
+
+	for (int i = 0; i < F.rows(); i++)
+	{
+		MC_V_start.row(i * 3 + 0) = V.row(F(i, 0));
+		MC_V_end.row(i * 3 + 0) = V.row(F(i, 1));
+
+		MC_V_start.row(i * 3 + 1) = V.row(F(i, 1));
+		MC_V_end.row(i * 3 + 1) = V.row(F(i, 2));
+
+		MC_V_start.row(i * 3 + 2) = V.row(F(i, 2));
+		MC_V_end.row(i * 3 + 2) = V.row(F(i, 0));
+	}
+
+}
