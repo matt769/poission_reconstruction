@@ -109,6 +109,9 @@ void modify_chi(const Eigen::MatrixXd& GV, const Eigen::MatrixXd& V_known, const
 
 void modify_normals(const Eigen::MatrixXd& GV, const double xMin, const double xMax, Eigen::MatrixXd& GN);
 
+void add_noise(const double pointPC, const double normalPC, Eigen::MatrixXd& V, Eigen::MatrixXd& N);
+
+
 #endif
 
 

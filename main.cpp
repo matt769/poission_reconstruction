@@ -8,6 +8,7 @@
 #include <iostream>
 #include <random>
 //#include <ctime>
+#include <string>
 
 #include "nanoflann.hpp"
 #include "mytools.h"
@@ -170,37 +171,83 @@ bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
 
 int main(int argc, char *argv[])
 {
+
+	//std::cout << "You have entered " << argc
+	//	<< " arguments:" << "\n";
+
+	//for (int i = 0; i < argc; ++i)
+	//	std::cout << argv[i] << "\n";
+
+
 	time_t timeStart;
 	timeStart = std::time(NULL);
 	std::cout << "Start time:" << timeStart << "\n";
+
+	// default parameters ************************************************************************************
+	int depth = 5;
+	size_t extra_layers = 2;
+	double pointPC = 0.0;
+	double normalPC = 0.0;
+
+
+	// check command line args ***********************************************************************
+	std::string fileName;
+	if (argc > 1)
+	{
+		fileName = std::string(argv[1]);
+	}
+	else
+	{
+		fileName = "circle.obj"; // CHANGE FILENAME HERE IF NOT PROVIDING VIA COMMAND LINE
+	}
+
+	if (argc > 2) depth = atoi(argv[2]);
+	if (argc > 3) extra_layers = atoi(argv[3]);
+	if (argc > 4) pointPC = atof(argv[4]);
+	if (argc > 5) normalPC = atof(argv[5]);
+
+
+	std::cout << "Depth:" << depth << "\n";
+	std::cout << "Extra layers:" << extra_layers << "\n";
 
 	// load data  ************************************************************************************
 	std::cout << "Loading point data\n";
 	Eigen::MatrixXd V;
 	Eigen::MatrixXd N;
 	Eigen::MatrixXi F;
-	get_point_data("circle.obj", V, N);
-	//get_point_data("circle_fewpoints.obj", V, N);
-	//get_point_data("sphere.obj", V, N);
-	//get_point_data("circle_noisy.obj", V, N);
-	//get_point_data("circle_noisy2.obj", V, N);
-	//get_point_data("circle_gap.obj", V, N);
 
-	//get_example_mesh("bunny.obj", V, F, N);
-	//N = -N; // Need to fix the normals to be pointing inside
-	//N /= 5; // And make them a little smaller too (just for viewing, shouldn't affect the result)
+	if (fileName == "bunny.obj")
+	{
+		get_example_mesh(fileName, V, F, N);
+		N = -N; // Need to fix the normals to be pointing inside
+		N /= 5; // And make them a little smaller too (just for viewing, shouldn't affect the result)
+	}
+	else if (fileName == "ext2.obj")
+	{
+		// EXTENSION MODIFICATION
+		get_point_data(fileName, V);
+		compute_normals(V, N);
+	}
+	else
+	{
+		get_point_data(fileName, V, N);
+	}
 
-	// EXTENSION MODIFICATION
-	//get_point_data("ext2.obj", V);
-	//compute_normals(V, N);
+
+	// add noise **************************************************************************************
+	if (pointPC > 0 || normalPC > 0)
+	{
+		add_noise(pointPC, normalPC, V, N);
+	}
+
+
+
 
 	//std::cout << "Sample vertices:" << V.rows() << "\n";
 	//std::cout << "V:\n" << V << "\n";
 
 	// create grid ************************************************************************************
 	std::cout << "Creating grid\n";
-	int depth = 7;
-	const size_t extra_layers = 2;
 	Eigen::MatrixXd GV;
 	Eigen::MatrixXi GE;
 	Resolution gridResolution;

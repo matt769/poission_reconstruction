@@ -896,3 +896,28 @@ void modify_normals(const Eigen::MatrixXd& GV, const double xMin, const double x
 
 
 }
+
+// add random noise within limits determined by pc (%) of bounding box
+void add_noise(const double pointPC, const double normalPC, Eigen::MatrixXd& V, Eigen::MatrixXd& N)
+{
+	// find bounding area
+	Eigen::RowVector3d BBmin = V.colwise().minCoeff();
+	Eigen::RowVector3d BBmax = V.colwise().maxCoeff();
+	Eigen::RowVector3d BBrange = BBmax - BBmin;
+	double BBdiag = BBrange.norm();
+	double pointNoiseLevel = BBdiag * pointPC;
+	double normalNoiseLevel = BBdiag * normalPC;
+
+	Eigen::MatrixXd pointNoise = Eigen::MatrixXd::Random(V.rows(), 3) * pointNoiseLevel;
+	Eigen::MatrixXd normalNoise = Eigen::MatrixXd::Random(V.rows(), 3) * normalNoiseLevel;
+
+	if (BBmin(2) == BBmax(2))	// 2D
+	{
+		pointNoise.block(0, 2, V.rows(), 1) = Eigen::MatrixXd::Zero(V.rows(), 1);
+		normalNoise.block(0, 2, V.rows(), 1) = Eigen::MatrixXd::Zero(V.rows(), 1);
+	}
+
+	V += pointNoise;
+	N += normalNoise;
+
+}
