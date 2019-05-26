@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
 	Eigen::MatrixXd V;
 	Eigen::MatrixXd N;
 	Eigen::MatrixXi F;
-	//get_point_data("circle.obj", V, N);
+	get_point_data("circle.obj", V, N);
 	//get_point_data("circle_fewpoints.obj", V, N);
 	//get_point_data("sphere.obj", V, N);
 	//get_point_data("circle_noisy.obj", V, N);
@@ -190,16 +190,17 @@ int main(int argc, char *argv[])
 	//N = -N; // Need to fix the normals to be pointing inside
 	//N /= 5; // And make them a little smaller too (just for viewing, shouldn't affect the result)
 
-	get_point_data("ext2.obj", V);
-	compute_normals(V, N);
+	// EXTENSION MODIFICATION
+	//get_point_data("ext2.obj", V);
+	//compute_normals(V, N);
 
 	//std::cout << "Sample vertices:" << V.rows() << "\n";
 	//std::cout << "V:\n" << V << "\n";
 
 	// create grid ************************************************************************************
 	std::cout << "Creating grid\n";
-	int depth = 4;
-	const size_t extra_layers = 10;
+	int depth = 7;
+	const size_t extra_layers = 2;
 	Eigen::MatrixXd GV;
 	Eigen::MatrixXi GE;
 	Resolution gridResolution;
@@ -211,11 +212,12 @@ int main(int argc, char *argv[])
 
 	// interpolate normals to grid points   *******************************************************************
 	std::cout << "Spread normals to grid points\n";
-	Eigen::MatrixXd GN;
-	size_t numGridPoints; // how many grid points to spread each sample point to
-	if (gridResolution.z == 1) numGridPoints = 4;
-	else numGridPoints = 8;
-	compute_grid_normals(V, N, GV, numGridPoints, GN);
+	Eigen::MatrixXd GN; // ** TODO ** initialise this to zeros
+	//size_t numGridPoints; // how many grid points to spread each sample point to
+	//if (gridResolution.z == 1) numGridPoints = 4;
+	//else numGridPoints = 8;
+	//compute_grid_normals(V, N, GV, numGridPoints, GN);
+	compute_grid_normals(V, N, GV, gridResolution, GN);
 	//std::cout << "Grid normals:" << GN.rows() << "\n";
 	//std::cout << "GN:\n" << GN << "\n";
 
@@ -229,6 +231,10 @@ int main(int argc, char *argv[])
 	//K << 7, 26, 41, 26, 7;
 	//Eigen::Matrix<double, 5, 1> K;
 	//K << 1, 1, 1, 1, 1;
+	//Eigen::Matrix<double, 7, 1> K;
+	//K << 1, 1, 1, 1, 1, 1, 1;
+	/*Eigen::Matrix<double, 9, 1> K;
+	K << 1, 1, 1, 1, 1, 1, 1, 1, 1;*/
 	//Eigen::Matrix<double, 1, 1> K;
 	//K << 1;
 	K /= K.sum();
@@ -241,6 +247,12 @@ int main(int argc, char *argv[])
 	//GN = GN_smoothed;
 	////std::cout << "Grid normals after convolution:\n" << weightedNormals << "\n";
 	////std::cout << weightedNormals << "\n";
+
+	// EXTENSION MODIFICATION
+	//double xMin = -0.2;
+	//double xMax = 0.2;
+	//modify_normals(GV, xMin, xMax, GN_smoothed);
+
 
 
 	//// construct Laplacian   ************************************************************************************
@@ -282,7 +294,7 @@ int main(int argc, char *argv[])
 	double isoval = compute_isovalue(V, GV, gridResolution, x);
 	std::cout << "isoval: " << isoval << "\n";
 
-	//isoval = -0.4;
+	//isoval = -0.3;
 
 	// Run igl marching cubes  ************************************************************************************
 	std::cout << "Running marching cubes\n";
@@ -309,6 +321,7 @@ int main(int argc, char *argv[])
 	//std::cout << "MC_F:\n" << MC_F << "\n";
 	//std::cout << "MC_V size: " << MC_V.rows() << ", " << MC_V.cols() << "\n";
 	
+	// EXTENSION MODIFICATION
 	// Try modifying the chi values of points near the known edges
 	//Eigen::MatrixXd V_known(5, 3);
 	////Eigen::MatrixXd V_known(10, 3);

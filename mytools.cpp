@@ -168,7 +168,7 @@ void xy2sq(const Eigen::MatrixXd &GV, const Resolution& res, const double x, con
 	vertex_ijk2idx(res, xIdx + 1, yIdx + 1, 0, square(1, 1));
 }
 
-
+// like xy2sq but returns the 2 squares that make up the cube containing the searched for point
 void xyz2cube(const Eigen::MatrixXd& GV, const Resolution& res, const double x, const double y, const double z, std::vector<Eigen::Matrix<size_t, 2, 2>>& cube)
 {
 
@@ -449,7 +449,8 @@ void compute_grid_normals(
 		{
 			//double weight = 1.0 / distsSqr[i];
 			//std::cout << N.row(searchPointIdx) << "\n";
-			weights(i) = 1.0 - distsSqr[i] / gridDiagSquared;
+			double weight = 1.0 - distsSqr[i] / gridDiagSquared;
+			weights(i) = std::max(0.0, weight); //
 			//V_nn.row(i) = V.row(neighbourIdx[i]);
 		}
 		weights /= weights.sum();
@@ -465,6 +466,125 @@ void compute_grid_normals(
 	GN = GN * gridSize / maxNormalSize;
 }
 
+// this version will spread the normals to the grid points containing the source vertex
+// will spread to 4 (square) if 2D and 8 (cube) if 3D
+void compute_grid_normals(
+	const Eigen::MatrixXd& V,
+	const Eigen::MatrixXd& N,
+	const Eigen::MatrixXd& GV,
+	const Resolution& res,
+	Eigen::MatrixXd& GN)
+{
+	GN = Eigen::MatrixXd::Zero(GV.rows(), 3);
+	double gridSize = (GV.row(0) - GV.row(1)).norm();
+	
+
+	if (res.z != 1)
+	{
+		// 3D
+		double gridDiag = sqrt(3) * gridSize;
+		for (int i = 0; i < V.rows(); i++)
+		{
+			// get the grid points that this normal should be spread to
+			std::vector<Eigen::Matrix<size_t, 2, 2>> cube;
+			xyz2cube(GV, res, V(i, 0), V(i, 1), V(i, 2), cube);
+			// for each grid point, take an equal share (for now) of the normal
+			//double weight = 1.0 / 8.0;
+			double totalWeight = 0.0;
+
+			for (auto square : cube)
+			{
+				// doesn't seem to be a reshape option for the matrix, old version?
+				Eigen::RowVector3d diff;
+				double dist;
+				double weight;
+				
+				diff = V.row(i) - GV.row(square(0, 0));
+				dist = diff.norm();
+				weight = 1.0 - dist / gridDiag;
+				GN.row(square(0, 0)) += N.row(i) * weight;
+				totalWeight += weight;
+
+				diff = V.row(i) - GV.row(square(0, 1));
+				dist = diff.norm();
+				weight = 1.0 - dist / gridDiag;
+				GN.row(square(0, 1)) += N.row(i) * weight;
+				totalWeight += weight;
+
+				diff = V.row(i) - GV.row(square(1, 0));
+				dist = diff.norm();
+				weight = 1.0 - dist / gridDiag;
+				GN.row(square(1, 0)) += N.row(i) * weight;
+				totalWeight += weight;
+
+				diff = V.row(i) - GV.row(square(1, 1));
+				dist = diff.norm();
+				weight = 1.0 - dist / gridDiag;
+				GN.row(square(1, 1)) += N.row(i) * weight;
+				totalWeight += weight;
+			}
+
+			for (auto square : cube)
+			{
+				GN.row(square(0, 0)) /= totalWeight;
+				GN.row(square(0, 1)) /= totalWeight;
+				GN.row(square(1, 0)) /= totalWeight;
+				GN.row(square(1, 1)) /= totalWeight;
+			}
+
+		}
+	}
+	else
+	{
+		// 2D
+		double gridDiag = sqrt(2) * gridSize;
+		for (int i = 0; i < V.rows(); i++)
+		{
+			// get the grid points that this normal should be spread to
+			Eigen::Matrix<size_t, 2, 2> square;
+			xy2sq(GV, res, V(i, 0), V(i, 1), square);
+			// for each grid point, take an equal share (for now) of the normal
+			Eigen::RowVector3d diff;
+			double dist;
+			double weight;
+			double totalWeight = 0.0;
+
+			diff = V.row(i) - GV.row(square(0, 0));
+			dist = diff.norm();
+			weight = 1.0 - dist / gridDiag;
+			GN.row(square(0, 0)) += N.row(i) * weight;
+			totalWeight += weight;
+
+			diff = V.row(i) - GV.row(square(0, 1));
+			dist = diff.norm();
+			weight = 1.0 - dist / gridDiag;
+			GN.row(square(0, 1)) += N.row(i) * weight;
+			totalWeight += weight;
+
+			diff = V.row(i) - GV.row(square(1, 0));
+			dist = diff.norm();
+			weight = 1.0 - dist / gridDiag;
+			GN.row(square(1, 0)) += N.row(i) * weight;
+			totalWeight += weight;
+
+			diff = V.row(i) - GV.row(square(1, 1));
+			dist = diff.norm();
+			weight = 1.0 - dist / gridDiag;
+			GN.row(square(1, 1)) += N.row(i) * weight;
+			totalWeight += weight;
+
+			GN.row(square(0, 0)) /= totalWeight;
+			GN.row(square(0, 1)) /= totalWeight;
+			GN.row(square(1, 0)) /= totalWeight;
+			GN.row(square(1, 1)) /= totalWeight;
+		}
+	}
+
+
+	double maxNormalSize = GN.rowwise().norm().maxCoeff();
+	GN = GN * gridSize / maxNormalSize;
+
+}
 
 
 // M is a list of the normal vectors that will be smoothed
@@ -750,6 +870,25 @@ void modify_chi(const Eigen::MatrixXd& GV, const Eigen::MatrixXd& V_known, const
 			X(neighbourIdx[i]) = isovalue;
 		}
 
+	}
+}
+
+
+// this functions is specific to the ext2 shape
+void modify_normals(const Eigen::MatrixXd& GV, const double xMin, const double xMax, Eigen::MatrixXd& GN)
+{
+	// identify x range in which to change normals
+	// remove all x component (and then fix back to original magnitude)
+	for (int i = 0; i < GV.rows(); i++)
+	{
+		// check if in range
+		if (GV(i, 0) >= xMin && GV(i, 0) <= xMax)
+		{
+			// if so, modify the associated normal
+			//GN(i, 0) = 0.0; // remove horizontal component (should probably try preserving th magnitude)
+			GN(i, 0) = -GN(i, 0); // flip horizontal component
+
+		}
 	}
 
 

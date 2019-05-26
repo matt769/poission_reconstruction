@@ -74,6 +74,13 @@ void compute_grid_normals(
 	const size_t k,
 	Eigen::MatrixXd &weightedNormals);
 
+void compute_grid_normals(
+	const Eigen::MatrixXd& V,
+	const Eigen::MatrixXd& N,
+	const Eigen::MatrixXd& GV,
+	const Resolution& res,
+	Eigen::MatrixXd& GN);
+
 bool solve_poisson_equation(const Eigen::SparseMatrix<double> L, const Eigen::MatrixXd DGV, Eigen::VectorXd& x);
 
 double compute_isovalue_3d(
@@ -99,6 +106,8 @@ void compute_normals(const Eigen::MatrixXd& V, Eigen::MatrixXd& N);
 void faces_to_edges(const Eigen::MatrixXi& F, const Eigen::MatrixXd& V, Eigen::MatrixXd& MC_V_start, Eigen::MatrixXd& MC_V_end);
 
 void modify_chi(const Eigen::MatrixXd& GV, const Eigen::MatrixXd& V_known, const size_t k, const double isovalue, Eigen::VectorXd& X);
+
+void modify_normals(const Eigen::MatrixXd& GV, const double xMin, const double xMax, Eigen::MatrixXd& GN);
 
 #endif
 
