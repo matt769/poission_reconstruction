@@ -620,6 +620,7 @@ void apply_convolution(const Eigen::MatrixXd& M, const Eigen::VectorXd& K, const
 		}
 	}
 	MK = MK_tmp;
+	MK_tmp = Eigen::MatrixXd::Zero(M.rows(), M.cols());
 
 	// Apply in y dimension
 	for (size_t xIdx = 0; xIdx < res.x; xIdx++)
@@ -646,6 +647,7 @@ void apply_convolution(const Eigen::MatrixXd& M, const Eigen::VectorXd& K, const
 		}
 	}
 	MK = MK_tmp;
+	MK_tmp = Eigen::MatrixXd::Zero(M.rows(), M.cols());
 
 	// Apply in z dimension
 	for (size_t xIdx = 0; xIdx < res.x; xIdx++)
