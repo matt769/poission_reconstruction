@@ -185,12 +185,18 @@ int main(int argc, char *argv[])
 
 	// default parameters ************************************************************************************
 	int depth = 5;
-	size_t extra_layers = 2;
+	size_t extra_layers = 3;
 	double pointPC = 0.0;
 	double normalPC = 0.0;
+	double isovalue = 0.0;
+	bool customIsovalue = false;
 
 
 	// check command line args ***********************************************************************
+	//for (int i = 0; i < argc; ++i)
+	//	std::cout << argv[i] << "\n";
+
+
 	std::string fileName;
 	if (argc > 1)
 	{
@@ -205,6 +211,11 @@ int main(int argc, char *argv[])
 	if (argc > 3) extra_layers = atoi(argv[3]);
 	if (argc > 4) pointPC = atof(argv[4]);
 	if (argc > 5) normalPC = atof(argv[5]);
+	if (argc > 6)
+	{
+		isovalue = atof(argv[6]);
+		customIsovalue = true;
+	}
 
 
 	std::cout << "Depth:" << depth << "\n";
@@ -323,7 +334,8 @@ int main(int argc, char *argv[])
 	//std::cout << "Divergence Z:" << Dz.rows() << "," << Dz.cols() << "\n";
 	//std::cout << "Dz:\n" << Dz << "\n";
 	Eigen::MatrixXd DGV = (Dx * GN_smoothed.col(0)) + (Dy * GN_smoothed.col(1)) + (Dz * GN_smoothed.col(2));
-	////std::cout << DGV << std::endl;
+	//std::cout << "Divergence:" << DGV.rows() << "," << DGV.cols() << "\n";
+	//std::cout << DGV << std::endl;
 
 
 
@@ -337,9 +349,12 @@ int main(int argc, char *argv[])
 	std::cout << "x min, max:\n" << x.minCoeff() << "," << x.maxCoeff() << "\n";
 
 	//// Calculate isovalue that will be used in marching cubes
-	std::cout << "Computing isovalue\n";
-	double isoval = compute_isovalue(V, GV, gridResolution, x);
-	std::cout << "isoval: " << isoval << "\n";
+	if (!customIsovalue)
+	{
+		std::cout << "Computing isovalue\n";
+		isovalue = compute_isovalue(V, GV, gridResolution, x);
+	}
+	std::cout << "Isovalue: " << isovalue << "\n";
 
 	//isoval = -0.3;
 
@@ -357,11 +372,11 @@ int main(int argc, char *argv[])
 		GV_3d.block(0, 0, GV.rows(), GV.cols()) = GV;
 		GV_3d.block(GV.rows(), 0, GV.rows(), GV.cols()) = GV;
 
-		igl::copyleft::marching_cubes(x_3d, GV_3d, gridResolution.x, gridResolution.y, gridResolution.z+1, isoval, MC_V, MC_F);
+		igl::copyleft::marching_cubes(x_3d, GV_3d, gridResolution.x, gridResolution.y, gridResolution.z+1, isovalue, MC_V, MC_F);
 	}
 	else
 	{
-		igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, isoval, MC_V, MC_F);
+		igl::copyleft::marching_cubes(x, GV, gridResolution.x, gridResolution.y, gridResolution.z, isovalue, MC_V, MC_F);
 	}
 
 	//std::cout << "MC_V:\n" << MC_V << "\n";
